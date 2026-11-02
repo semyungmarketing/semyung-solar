@@ -165,6 +165,13 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
 .sub-ico{font-size:18px;line-height:1;text-shadow:0 0 3px #fff}
 .hz .sggtip{display:none}
 .mob{display:none}
+#gateForm .field{grid-template-columns:120px 1fr}
+#gateForm .field input,#gateForm .field select{text-align:left}
+.consent{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px}
+.consent label{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:13.5px;line-height:1.45;cursor:pointer}
+.consent input{margin-top:3px;flex:none}.consent hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.ctbl{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 6px 22px;width:calc(100% - 22px)}
+.ctbl th{width:92px;color:var(--muted);font-weight:600;background:#F6F8F6}.ctbl th,.ctbl td{border:1px solid var(--line);padding:4px 6px;vertical-align:top}
 .lbl{background:var(--pine);color:#fff;border:0;border-radius:6px;font-weight:600;box-shadow:none}
 .lbl::before{display:none}
 
@@ -245,6 +252,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
           <li>건물이 있으면 지붕형, 없으면 지상형으로 자동 선택해 용량과 20년 수익을 계산합니다. 결과 화면에서 바꿀 수 있습니다.</li>
         </ol>
         <div class="notice" id="keyNotice"></div>
+        <p class="hint" style="margin-top:10px"><a href="privacy.html" target="_blank" rel="noopener"><b>개인정보 처리방침</b></a></p>
       </div>
       <div id="r1"></div>
     </section>
@@ -297,14 +305,32 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
 <div id="legend"></div>
 
 <!-- dialogs -->
-<dialog id="dlgAgree">
-  <header><h3>☀️ 세명 태양광 부지진단 이용 안내</h3></header>
-  <div class="mb">
-    <p>이 서비스가 보여주는 모든 분석 결과는 <b>법적 효력이 없으며 참고 자료로만</b> 쓸 수 있습니다.</p>
-    <p>태양광 발전사업 <b>인허가를 신청할 때</b>는 다른 법령에 따른 제한이 있을 수 있으니 <b>관할 지자체·한국전력 등 관계기관에 확인</b>한 뒤 신청하세요.</p>
-    <p style="color:var(--muted);font-size:13px">분석은 공공데이터(브이월드, NASA POWER, OpenStreetMap, 국가법령정보 등)를 바탕으로 하며, 데이터 기준 시점과 측정 방식에 따라 실제와 다를 수 있습니다. 2026년 9월 18일부터 시행된 태양광 이격거리 국가 상한(주거지 최대 200m, 도로 이격 금지) 이후 지자체별 조례 정비가 진행 중이므로 이격거리는 반드시 관할 허가부서에 확인하세요.</p>
-  </div>
-  <div class="mf"><button class="btn" id="btnAgree">위 내용을 확인했으며 동의합니다</button></div>
+<dialog id="dlgAgree" aria-labelledby="gateTitle">
+  <header><h3 id="gateTitle">☀️ 세명 태양광 부지진단 이용 신청</h3></header>
+  <form id="gateForm" class="mb" novalidate>
+    <p style="margin-top:0">무료로 이용하실 수 있습니다. 이용자 확인을 위해 아래 정보를 입력해 주세요.</p>
+    <div class="field"><label for="gName">이름 <b style="color:var(--bad)">*</b></label><input id="gName" autocomplete="name" maxlength="30" style="text-align:left" required></div>
+    <div class="field"><label for="gPhone">휴대폰 번호 <b style="color:var(--bad)">*</b></label><input id="gPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" maxlength="13" style="text-align:left" required></div>
+    <div class="field"><label for="gPurpose">이용 목적 (선택)</label><select id="gPurpose"><option value="">선택 안 함</option><option>내 땅 태양광 검토</option><option>건물 지붕 태양광 검토</option><option>발전사업 검토</option><option>기타</option></select></div>
+    <div class="field"><label for="gRegion">관심 지역 (선택)</label><input id="gRegion" maxlength="40" placeholder="예: 아산시 음봉면" style="text-align:left"></div>
+    <input id="gWebsite" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px">
+    <div class="consent">
+      <label><input type="checkbox" id="cAll"> <b>아래 내용에 모두 동의합니다</b></label>
+      <hr>
+      <label><input type="checkbox" id="cReq" class="cc"> [필수] 개인정보 수집·이용 동의</label>
+      <table class="ctbl"><tr><th>수집·이용 목적</th><td>부지진단 서비스 이용자 확인, 이용자가 요청한 문의 응대</td></tr>
+        <tr><th>수집 항목</th><td>이름, 휴대폰 번호 / (선택) 이용 목적, 관심 지역</td></tr>
+        <tr><th>보유·이용 기간</th><td>수집일로부터 1년 (기간이 지나면 자동 파기)</td></tr>
+        <tr><th>동의 거부 권리</th><td>동의를 거부할 수 있습니다. 다만 거부하면 부지진단 서비스를 이용할 수 없습니다.</td></tr></table>
+      <p class="hint" style="margin:4px 0 8px">입력하신 정보는 Cloudflare, Inc.(미국)의 서버에 암호화 전송되어 보관됩니다. 자세한 내용은 <a href="privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a>을 확인하세요.</p>
+      <label><input type="checkbox" id="cAge" class="cc"> [필수] 만 14세 이상입니다</label>
+      <label><input type="checkbox" id="cDisc" class="cc"> [필수] 분석 결과는 공공데이터 기반 참고자료로 법적 효력이 없으며, 인허가는 관할 지자체·한국전력 등에 확인해야 함을 확인했습니다</label>
+      <label><input type="checkbox" id="cMkt" class="cc"> [선택] 광고성 정보 수신 동의</label>
+      <table class="ctbl"><tr><th>목적</th><td>태양광 사업·지원사업·행사 안내 (문자·전화)</td></tr><tr><th>항목</th><td>이름, 휴대폰 번호</td></tr><tr><th>기간</th><td>동의 철회 시 또는 수집일로부터 1년까지</td></tr><tr><th>거부 권리</th><td>동의하지 않아도 서비스를 이용할 수 있습니다.</td></tr></table>
+    </div>
+    <p class="hint" id="gMsg" role="alert" style="color:var(--bad)"></p>
+    <div class="mf" style="padding:12px 0 0;border:0"><button class="btn" id="btnAgree" type="submit" style="width:100%">동의하고 시작하기</button></div>
+  </form>
 </dialog>
 
 <dialog id="dlgSettings">
@@ -701,7 +727,7 @@ let busy=false;
 const RESULT_CACHE=new Map();
 async function analyze(ll,drawn){
   if(busy)return;
-  if(!localStorage.getItem('sms.agree')){$('#dlgAgree').showModal();return}
+  if(!leadDone()){$('#dlgAgree').showModal();return}
   const lat=ll.lat,lon=ll.lng;
   const sg=findSgg(lat,lon);
   if(!sg){toast('국내 육지 필지를 선택하세요.');return}
@@ -1011,7 +1037,23 @@ function legend(){$('#legend').onclick=()=>$('#legend').classList.toggle('open')
 $$('[data-modal]').forEach(b=>b.onclick=()=>$('#'+b.dataset.modal).showModal());
 $$('dialog [data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d&&d.id!=='dlgAgree')d.close()}));
-$('#btnAgree').onclick=()=>{localStorage.setItem('sms.agree',new Date().toISOString());$('#dlgAgree').close()};
+const POLICY_VER='2026-11-02';
+const leadDone=()=>{try{return localStorage.getItem('sms.lead')===POLICY_VER}catch(e){return false}};
+$('#cAll').onchange=e=>$$('.cc').forEach(c=>c.checked=e.target.checked);
+$$('.cc').forEach(c=>c.onchange=()=>$('#cAll').checked=$$('.cc').every(x=>x.checked));
+$('#gPhone').oninput=e=>{const d=e.target.value.replace(/\D/g,'').slice(0,11);e.target.value=d.length>7?d.replace(/(\d{3})(\d{3,4})(\d{4})/,'$1-$2-$3'):d.length>3?d.slice(0,3)+'-'+d.slice(3):d};
+$('#gateForm').onsubmit=async e=>{e.preventDefault();const msg=$('#gMsg');msg.textContent='';
+  const name=$('#gName').value.trim(),phone=$('#gPhone').value.replace(/\D/g,'');
+  if(name.length<2){msg.textContent='이름을 입력해 주세요.';$('#gName').focus();return}
+  if(!/^01[016789]\d{7,8}$/.test(phone)){msg.textContent='휴대폰 번호를 확인해 주세요.';$('#gPhone').focus();return}
+  if(!$('#cReq').checked||!$('#cAge').checked||!$('#cDisc').checked){msg.textContent='필수 항목 3개에 동의해 주세요.';return}
+  const btn=$('#btnAgree');btn.disabled=true;btn.textContent='등록 중…';
+  try{const base=(CFG.kepcoProxy||'').replace(/\/$/,'');if(!base)throw new Error('등록 서버가 설정되지 않았습니다');
+    const r=await fetch(base+'/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,purpose:$('#gPurpose').value,region:$('#gRegion').value.trim(),website:$('#gWebsite').value,agreeRequired:true,agreeAge:true,agreeMarketing:$('#cMkt').checked,policyVersion:POLICY_VER})});
+    const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));
+    localStorage.setItem('sms.lead',POLICY_VER);$('#dlgAgree').close();toast('등록됐습니다. 지도에서 분석할 땅을 눌러 보세요.');
+  }catch(err){msg.textContent='등록하지 못했습니다: '+err.message+' 잠시 후 다시 시도해 주세요.'}
+  finally{btn.disabled=false;btn.textContent='동의하고 시작하기'}};
 $('#dlgAgree').addEventListener('cancel',e=>e.preventDefault());
 $('#btnPrint').onclick=()=>{if(!R){toast('먼저 필지를 분석하세요.');return}window.print()};
 function staticDialogs(){
@@ -1046,7 +1088,7 @@ function staticDialogs(){
   <tr><td>계통 여유용량</td><td>한국전력공사 전력데이터 개방포털 분산전원연계 정보 API(실시간) / 보조: 한전 지역별 공급가능 변전소 정보(2024.5.13)</td></tr>
   <tr><td>법정 상한</td><td>${esc(LEGAL.basis)}, ${LEGAL.since} 시행</td></tr>
   <tr><td>SMP·REC 기본값</td><td>전력거래소 계통한계가격·신재생원스톱 현물시장(2026년 10월 3주차 육지 평균)</td></tr></table>
-  <p class="hint">모든 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 인허가는 관계기관 확인이 필요합니다.</p>`;
+  <p class="hint">모든 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 인허가는 관계기관 확인이 필요합니다. · <a href="privacy.html" target="_blank" rel="noopener">개인정보 처리방침</a></p>`;
 }
 
 /* ===== 설정·데이터 불러오기 ===== */
@@ -1087,7 +1129,7 @@ async function loadAuto(){
 
 /* ===== 시작 ===== */
 buildSgg();legend();staticDialogs();render5();keyNotice();loadAuto();
-if(!localStorage.getItem('sms.agree'))$('#dlgAgree').showModal();
+if(!leadDone())$('#dlgAgree').showModal();
 
 </script>
 </body>

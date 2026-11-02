@@ -16,5 +16,5 @@
  "roofUse": 70,
  "roofPyeongPerKw": 2.5,
  "costRoof": 1150000,
- "kepcoProxy": "https://semyung-kepco.kmh09412.workers.dev"
+ "kepcoProxy": ""
 }

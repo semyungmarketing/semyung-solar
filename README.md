@@ -18,15 +18,19 @@ raw 폴더 → Add file → Upload files → 새 조례 엑셀 올리기 → Com
 ## 계통(한전 변전소·여유용량)
 현재 버전은 판정에 포함하지 않습니다.
 
-## 한전 계통 여유용량 (분산전원연계 정보)
-필지를 누르면 PNU(시도·시군구 코드)와 지번주소(읍면동·리·번지)로 한전 API를 조회해 변전소·변압기·선로(DL) 여유용량을 판정합니다.
-한전 키를 페이지에 넣으면 누구나 볼 수 있으므로, 무료 Cloudflare Worker를 중계(프록시)로 씁니다.
+## Cloudflare Worker (worker/worker.js 한 파일)
+- `/` 한전 분산전원연계 정보 중계 (키는 Worker 비밀값 KEPCO_KEY)
+- `/lead` 이용 신청(이름·휴대폰·동의) 저장 → D1 데이터베이스
+- `/admin` 이용자 명단 (관리자 비밀번호) · 엑셀 다운로드 · 삭제
 
-1. https://dash.cloudflare.com 가입 → Workers & Pages → Create → Worker 만들기
-2. 이름 예: `semyung-kepco` → Deploy → Edit code → `worker/kepco-proxy.js` 내용을 통째로 붙여넣고 Deploy
-3. Worker의 Settings → Variables and Secrets → Add → Type: Secret, Name: `KEPCO_KEY`, Value: 한전 인증키 → Deploy
-4. Worker 주소(예: `https://semyung-kepco.계정명.workers.dev`)를 복사
-5. 사이트 ⚙ 설정 → "프록시 주소"에 붙여넣고 저장
-   (모든 방문자에게 적용하려면 data/prices.json 에 `"kepcoProxy": "https://...workers.dev"` 한 줄 추가)
+### 설정 순서
+1. 스토리지 및 데이터베이스 → D1 → 데이터베이스 생성 → 이름 `semyung-leads` (위치: 아시아 태평양 권장)
+2. Workers 및 Pages → semyung-kepco → 설정 → 바인딩 → 추가 → D1 데이터베이스 → 변수 이름 `DB`, 데이터베이스 `semyung-leads` → 배포
+3. 설정 → 변수 및 비밀 → 추가 → 비밀 `ADMIN_PASSWORD` (관리자 비밀번호, 12자 이상 권장) → 배포
+4. 코드 편집 → 기존 코드 전부 지우고 `worker/worker.js` 붙여넣기 → 배포
+5. 명단 보기: https://semyung-kepco.kmh09412.workers.dev/admin (아이디 칸은 아무거나, 비밀번호 칸에 ADMIN_PASSWORD)
 
-보조 자료: raw/substations_area.csv (한전 지역별 공급가능 변전소, 2024.5) → data/substations_area.json
+표(테이블)는 첫 신청 때 자동으로 만들어지고, 1년 지난 정보는 자동 삭제됩니다.
+
+## 개인정보 처리방침
+`privacy.html` 의 【 】 칸(처리자 회사명, 보호책임자 이름·직책·연락처·이메일·주소)을 반드시 채운 뒤 공개하세요.
