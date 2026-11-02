@@ -1,7 +1,6 @@
 """
 raw/ 폴더의 원본 파일을 지도 페이지가 읽는 data/*.json 으로 변환합니다.
  - raw/ 안의 조례 엑셀(파일명에 '조례' 포함, .xlsx)       → data/ordinances.json
- - raw/ 안의 시공지도 외부공유용 HTML 또는 시공사례 엑셀  → data/sites.json
 GitHub Actions(convert.yml)가 raw/ 에 파일이 올라오면 자동으로 실행합니다.
 """
 import glob, json, os, re, datetime
@@ -101,38 +100,6 @@ def convert_ordinances(path):
     if unmatched:
         print("시·군 경계 이름과 맞지 않아 건너뜀:", ", ".join(sorted(unmatched)))
 
-def write_sites(out):
-    json.dump({"updated": datetime.date.today().isoformat(), "items": out},
-              open(os.path.join(DATA, "sites.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"), default=str)
-    print(f"시공사례: {len(out)}곳 → data/sites.json")
-
-def convert_sites_html(path):
-    s = open(path, encoding="utf-8").read()
-    i = s.find("DATA=[")
-    if i < 0:
-        return False
-    d, _ = json.JSONDecoder().raw_decode(s[i + 5:])
-    write_sites([{"lat": x["y"], "lon": x["x"], "e": x.get("e", ""), "k": x.get("k", ""), "kw": x.get("c"),
-                  "area": f'{x.get("s","")} {x.get("g","")} {x.get("d","")}'.strip()} for x in d if x.get("y") and x.get("x")])
-    return True
-
-def convert_sites_xlsx(path):
-    ws = load_workbook(path, read_only=True, data_only=True).active
-    rows = list(ws.iter_rows(values_only=True))
-    head = [str(h or "").replace(" ", "") for h in rows[0]]
-    def col(*keys):
-        return next((i for i, h in enumerate(head) if any(k in h for k in keys)), None)
-    la, lo, kw, en, kd, ar = col("위도", "lat"), col("경도", "lon", "lng"), col("용량"), col("에너지"), col("설치유형", "유형"), col("주소", "읍면동", "지역")
-    out = []
-    for r in rows[1:]:
-        try:
-            y, x = float(r[la]), float(r[lo])
-        except Exception:
-            continue
-        g = lambda i, d="": r[i] if i is not None and r[i] is not None else d
-        out.append({"lat": y, "lon": x, "e": g(en, "태양광"), "k": g(kd), "kw": g(kw, None), "area": g(ar)})
-    write_sites(out)
-
 def newest(*patterns):
     fs = [f for p in patterns for f in glob.glob(os.path.join(RAW, p)) if not os.path.basename(f).startswith("~$")]
     return max(fs, key=os.path.getmtime) if fs else None
@@ -141,7 +108,3 @@ if __name__ == "__main__":
     os.makedirs(DATA, exist_ok=True)
     o = newest("*조례*.xlsx", "*ordinance*.xlsx")
     if o: convert_ordinances(o)
-    h = newest("*시공*.html", "*sites*.html")
-    if not (h and convert_sites_html(h)):
-        x = newest("*시공*.xlsx", "*sites*.xlsx")
-        if x: convert_sites_xlsx(x)
