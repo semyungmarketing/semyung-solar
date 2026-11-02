@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>세명 태양광 부지진단 – 내 땅 설치 가능 여부·이격거리·발전 수익</title>
-<meta name="description" content="주소나 필지를 선택하면 용도지역·농업진흥지역·경사도·조례 이격거리·변전소 거리와 예상 발전량·수익을 지도 위에서 분석합니다. 공공데이터 기반 참고용 서비스입니다.">
+<meta name="description" content="주소나 필지를 선택하면 용도지역·농업진흥지역·경사도·조례 이격거리와 예상 발전량·수익을 지도 위에서 분석합니다. 공공데이터 기반 참고용 서비스입니다.">
 <meta property="og:title" content="세명 태양광 부지진단">
 <meta property="og:description" content="내 땅에 태양광을 세울 수 있는지, 얼마나 벌 수 있는지 지도에서 바로 확인하세요.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☀️</text></svg>">
@@ -240,7 +240,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
         <div class="fit no">🚫 <b>분석 대상이 아닙니다</b><br>주택·건물 지붕의 자가소비형 태양광 (이격거리 규제 대상 아님)</div>
         <ol class="how">
           <li>위 검색창에 주소를 넣거나 지도에서 땅을 누릅니다.</li>
-          <li>용도지역·농업진흥지역·경사·주택 거리·변전소를 자동으로 확인합니다.</li>
+          <li>용도지역·농업진흥지역·경사·주택 거리·조례 기준을 자동으로 확인합니다.</li>
           <li>설비 용량과 20년 수익을 계산하고, 보고서로 출력합니다.</li>
         </ol>
         <div class="notice" id="keyNotice"></div>
@@ -282,10 +282,9 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
     <label><input type="checkbox" id="lyCad"> 🔳 연속지적도 <small>(브이월드 키)</small></label>
     <label><input type="checkbox" id="lyZone"> 🟩 용도지역 <small>(브이월드 키)</small></label>
     <label><input type="checkbox" id="lySgg" checked> 🗺️ 시·군 조례 현황</label>
-    <h6>주변 현황 (화면 범위)</h6>
-    <label><input type="checkbox" id="lySub"> 🏭 변전소</label>
+    <h6>주변 현황</h6>
     <label><input type="checkbox" id="lySolar"> ☀️ 태양광 발전소</label>
-    <label><input type="checkbox" id="lySites"> 🏗️ 세명 시공사례</label>
+    <label><input type="checkbox" id="lySites" checked> 🏗️ 세명 시공사례</label>
   </div>
   <div class="flyout" id="flyTools">
     <button class="tool" data-tool="dist">📏 거리 측정</button>
@@ -316,7 +315,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
     <div class="field"><label for="cfgKey">인증키</label><input id="cfgKey" type="password" style="text-align:left" placeholder="브이월드 인증키"></div>
     <div class="field"><label for="cfgDomain">등록 도메인</label><input id="cfgDomain" style="text-align:left"></div>
     <h4 class="sec">조례 이격거리 데이터</h4>
-    <p class="hint">조례 모니터링 엑셀(또는 CSV)을 불러오면 내장 데이터보다 우선 적용됩니다. 열 이름: <b>시도, 시군, 주거(m), 도로(m), 처리방침, 비고, 기준일</b>. 처리방침은 <i>기존조례적용 / 미적용 / 상한적용 / 개정완료</i> 중 하나로 적습니다.</p>
+    <p class="hint">평소에는 저장소의 조례 모니터링 엑셀(raw 폴더)이 자동 적용됩니다. 여기서 엑셀을 불러오면 이 브라우저에서만 그 값이 우선합니다. 열 이름: <b>시도, 시군, 주거(m), 도로(m), 처리방침, 비고, 기준일</b>. 처리방침은 <i>기존조례적용 / 미적용 / 상한적용 / 개정완료</i> 중 하나로 적습니다.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <label class="btn alt" style="display:inline-block">엑셀·CSV 불러오기<input type="file" id="ordFile" accept=".xlsx,.xls,.csv" hidden></label>
       <button class="btn alt" id="ordTemplate">양식 내려받기</button>
@@ -325,7 +324,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
     </div>
     <p class="hint" id="ordStatus"></p>
     <h4 class="sec">세명 시공사례</h4>
-    <p class="hint">시공지도 외부공유용 엑셀을 불러오면 지도에 시공사례로 표시됩니다. 열 이름: <b>현장명, 위도, 경도, 용량(kW), 구분</b>. 개인정보·사업비 열은 읽지 않습니다.</p>
+    <p class="hint">기본으로 저장소의 시공지도 외부공유용 자료가 표시됩니다. 다른 목록을 잠깐 보고 싶을 때만 엑셀을 불러오세요. 열 이름: <b>현장명, 위도, 경도, 용량(kW), 구분</b>. 개인정보·사업비 열은 읽지 않습니다.</p>
     <div style="display:flex;gap:8px"><label class="btn alt" style="display:inline-block">시공사례 엑셀 불러오기<input type="file" id="siteFile" accept=".xlsx,.xls,.csv" hidden></label><button class="btn alt" id="siteClear">지우기</button></div>
     <p class="hint" id="siteStatus"></p>
   </div>
@@ -419,14 +418,15 @@ const GLOSSARY = [
 /* ===== 공통 ===== */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const DEF={vkey:'',vdomain:location.hostname||'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0,gridMW:''};
-let CFG=Object.assign({},DEF,LS.get('sms.cfg',{}));
-let ORD_USER=LS.get('sms.ord',{}), ORD_AUTO={}, SITES=LS.get('sms.sites',[]);
+const DEF={vkey:'8ECCB2A4-F393-378E-90A5-8888E133E7F0',vdomain:'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0};
+let BASE={...DEF};
+let CFG=Object.assign({},BASE,LS.get('sms.cfg',{}));
+let ORD_USER=LS.get('sms.ord',{}), ORD_AUTO={}, ORD_META={}, SITES=LS.get('sms.sites',[]);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const nf=(x,d=0)=>x==null||isNaN(x)?'–':Number(x).toLocaleString('ko-KR',{maximumFractionDigits:d,minimumFractionDigits:d});
 const won=x=>{if(x==null||isNaN(x))return'–';const a=Math.abs(x),s=x<0?'-':'';return a>=1e8?s+(a/1e8).toFixed(2)+'억원':s+Math.round(a/1e4).toLocaleString('ko-KR')+'만원'};
 const PY=3.3058;
-const saveCfg=()=>LS.set('sms.cfg',CFG);
+const saveCfg=()=>{const d={};for(const k in CFG)if(CFG[k]!==BASE[k])d[k]=CFG[k];LS.set('sms.cfg',d)};
 
 /* ===== 지도 ===== */
 const map=L.map('map',{zoomControl:false,doubleClickZoom:true}).setView([36.45,127.6],7);
@@ -449,14 +449,14 @@ $$('[data-base]').forEach(b=>b.onclick=()=>setBase(b.dataset.base));
 function ordFor(sido,sgg){
   const k=sido+'|'+sgg;
   if(ORD_USER[k]) return {...ORD_USER[k],origin:'user'};
-  if(ORD_AUTO[k]) return {...(ORD_BUILTIN[k]||{}),...ORD_AUTO[k],origin:'auto'};
+  if(ORD_AUTO[k]) return {...(ORD_BUILTIN[k]||{}),...ORD_AUTO[k],origin:'excel'};
   if(ORD_BUILTIN[k]) return {...ORD_BUILTIN[k],origin:'builtin'};
   return null;
 }
 function ordStatus(o){
   if(!o) return 'unk';
-  if(o.p==='none'||(o.h===0&&!o.r)) return 'free';
   if(o.p==='old') return 'old';
+  if(o.p==='none'||(o.h===0&&!o.r)) return 'free';
   if(o.p==='amended'||o.p==='cap') return 'cap';
   if(o.h!=null&&o.h<=200&&!(o.r>0)) return 'cap';
   return 'over';
@@ -467,13 +467,13 @@ function applied(o){
   const s=ordStatus(o);
   if(s==='free') return {mode:'free',house:0,road:0,text:o.p==='none'?'조례 정비 전까지 이격거리를 적용하지 않는다고 답변한 지자체입니다.':'이격거리 규제가 없습니다.'};
   if(s==='old'){
-    if(o.h==null&&o.r==null) return {mode:'oldUnknown',house:null,road:null,text:'개정 법령 시행 후에도 기존 조례를 적용한다고 답변했습니다. 수치는 조례 원문 확인이 필요합니다.'};
+    if(!(o.h>0)&&!(o.r>0)) return {mode:'oldUnknown',house:null,road:null,text:'개정 법령 시행 후에도 기존 조례를 적용한다고 답변했습니다. 수치는 조례 원문 확인이 필요합니다.'};
     return {mode:'old',house:o.h??null,road:o.r??null,road2:o.r2??null,text:'기존 조례(도로 이격 포함)를 계속 적용한다고 답변한 지자체입니다. 상위법 충돌 논란이 있으니 허가부서에 확인하세요.'};
   }
   const h=o.h==null?LEGAL.house:Math.min(o.h,LEGAL.house);
   return {mode:'cap',house:h,road:0,text:o.h==null?`개정 조례 수치가 미수록이라 상한 ${LEGAL.house}m를 가정했습니다.`:(o.h>LEGAL.house?`조례(${nf(o.h)}m)가 법정 상한을 넘어, 상한 ${LEGAL.house}m가 적용되는 것으로 봤습니다. 정비 전 처리 방침은 지자체마다 다릅니다.`:`조례 기준 ${nf(o.h)}m를 적용했습니다.`)};
 }
-function ordSrcText(o){if(!o)return'';if(o.origin==='user')return'불러온 조례 데이터'+(o.d?` (${esc(o.d)})`:'');if(o.origin==='auto')return'국가법령정보 자동수집'+(o.d?` (${esc(o.d)})`:'');return (o.src||'').split(',').map(s=>ORD_SRC[s]||s).join(' / ')}
+function ordSrcText(o){if(!o)return'';if(o.origin==='user')return'불러온 조례 데이터'+(o.d?` (${esc(o.d)})`:'');if(o.origin==='excel')return`조례 모니터링 엑셀(자치법규정보시스템 원문 정리, ${esc(ORD_META.updated||'')} 갱신) · ${esc(o.title||'')} ${o.d?esc(o.d)+' 개정':''}`;return (o.src||'').split(',').map(s=>ORD_SRC[s]||s).join(' / ')}
 
 /* ===== 시군 레이어 ===== */
 let sggLayer;
@@ -529,7 +529,7 @@ $$('.examples button').forEach(b=>b.onclick=()=>{const [a,c]=b.dataset.ll.split(
 
 /* ===== 분석 ===== */
 let R=null, judgeLayer=L.layerGroup().addTo(map), houseLayer=L.layerGroup().addTo(map);
-const STEPS=[['admin','행정구역·조례 이격거리'],['parcel','필지 경계·지목 (브이월드)'],['zone','용도지역·농업진흥·개발제한 (브이월드)'],['terrain','경사·사면향 (DEM 고도)'],['sun','일사량 (NASA POWER 위성 기후값)'],['near','주변 주택·도로·변전소·발전소']];
+const STEPS=[['admin','행정구역·조례 이격거리'],['parcel','필지 경계·지목 (브이월드)'],['zone','용도지역·농업진흥·개발제한 (브이월드)'],['terrain','경사·사면향 (DEM 고도)'],['sun','일사량 (NASA POWER 위성 기후값)'],['near','주변 주택·도로·기존 발전소 (OSM / 브이월드)']];
 function stepUI(){$('#steps').innerHTML=STEPS.map(s=>`<li id="st-${s[0]}">${s[1]}</li>`).join('')}
 function step(id,cls,txt){const li=$('#st-'+id);if(!li)return;li.className=cls;if(txt)li.innerHTML=STEPS.find(s=>s[0]===id)[1]+` <small>${esc(txt)}</small>`}
 
@@ -595,15 +595,13 @@ async function stepNear(r){
   const Rb=Math.min(need+150,1300), Rr=Math.min(Math.max(a.road||0,a.road2||0,300)+100,1300);
   const q=`[out:json][timeout:25];(way["building"](around:${Rb},${r.lat},${r.lon});node["building"](around:${Rb},${r.lat},${r.lon}););out center tags 4000;
 way["highway"~"^(motorway|trunk|primary|secondary|tertiary|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"](around:${Rr},${r.lat},${r.lon});out geom tags;
-nwr["power"="substation"](around:25000,${r.lat},${r.lon});out center tags;
 (nwr["power"="plant"]["plant:source"="solar"](around:3000,${r.lat},${r.lon});nwr["power"="generator"]["generator:source"="solar"](around:2000,${r.lat},${r.lon}););out center tags 300;`;
-  const tg=r.target;let houses=[],roads=[],subs=[],solars=[],src=['OSM'];
+  const tg=r.target;let houses=[],roads=[],solars=[],src=['OSM'];
   const d=await overpass(q);
   for(const e of d.elements||[]){
     const t=e.tags||{};const c=e.center||(e.lat?{lat:e.lat,lon:e.lon}:null);
     if(t.building&&c){const b=t.building;if(NONRES.test(b)||t.amenity||t.shop||t.office)continue;houses.push({lat:c.lat,lon:c.lon,kind:RES.test(b)?'주택':'주택 추정',d:tg.dist(c.lon,c.lat)})}
     else if(t.highway&&e.geometry){const line=turf.lineString(e.geometry.map(g=>[g.lon,g.lat]));let m=1e9;for(const v of tg.verts)m=Math.min(m,turf.pointToLineDistance(turf.point(v),line,{units:'meters'}));if(tg.f)for(const g of e.geometry)m=Math.min(m,tg.dist(g.lon,g.lat));const cls=/^(motorway|trunk|primary)/.test(t.highway)?'고속·국도급':'지방도·군도급';roads.push({name:t.name||(t.ref?t.ref+'번 도로':cls),cls,d:m,geom:e.geometry})}
-    else if(t.power==='substation'&&c){subs.push({name:t.name||'이름 미상 변전소',kv:t.voltage?String(t.voltage).split(';').map(v=>Math.round(+v/1000)).filter(Boolean).join('/')+'kV':'',lat:c.lat,lon:c.lon,d:turf.distance([r.lon,r.lat],[c.lon,c.lat],{units:'meters'}),dist:t.substation||''})}
     else if(c&&(t['plant:source']==='solar'||t['generator:source']==='solar')){solars.push({lat:c.lat,lon:c.lon,name:t.name||'',d:turf.distance([r.lon,r.lat],[c.lon,c.lat],{units:'meters'})})}
   }
   if(CFG.vkey){
@@ -613,9 +611,9 @@ nwr["power"="substation"](around:25000,${r.lat},${r.lon});out center tags;
   }
   houses=houses.filter(h=>h.d<=Rb).sort((x,y)=>x.d-y.d).slice(0,1500);
   for(const h of houses){let c=0;for(const o of houses){if(Math.abs(o.lat-h.lat)<0.0011&&Math.abs(o.lon-h.lon)<0.0014&&turf.distance([h.lon,h.lat],[o.lon,o.lat],{units:'meters'})<=100)c++}h.cluster=c>=5}
-  roads.sort((x,y)=>x.d-y.d);subs.sort((x,y)=>x.d-y.d);solars.sort((x,y)=>x.d-y.d);
-  r.near={houses,roads,subs:subs.slice(0,5),solars,src:src.join(' + '),Rb};
-  return `주택 ${houses.length}채, 변전소 ${subs.length?nf(subs[0].d/1000,1)+'km':'없음'}`;
+  roads.sort((x,y)=>x.d-y.d);solars.sort((x,y)=>x.d-y.d);
+  r.near={houses,roads,solars,src:src.join(' + '),Rb};
+  return `주택 ${houses.length}채, 주요도로 ${roads.length?nf(roads[0].d)+'m':'반경 내 없음'}`;
 }
 
 let busy=false;
@@ -689,11 +687,6 @@ function judge(r){
     }
   }
   it.push({k:'조례 이격거리',v:sb.v,lv:sb.lv,d:sb.d});
-  // 계통
-  if(n&&n.subs.length){const s=n.subs[0],km=s.d/1000;const lv=km<=10?'ok':'warn';
-    it.push({k:'계통(변전소)',v:`${nf(km,1)}km`,lv,d:`가장 가까운 변전소: ${s.name}${s.kv?' ('+s.kv+')':''}. 실제 접속 가능 여부는 한전 배전선로·변전소 여유용량으로 결정됩니다.`+(CFG.gridMW!==''?` 입력한 여유용량 ${CFG.gridMW}MW.`:'')})}
-  else it.push({k:'계통(변전소)',v:'미확인',lv:'unk',d:'반경 25km 안에서 변전소 위치 자료를 찾지 못했습니다. 한전ON에서 여유용량을 확인하세요.'});
-  if(CFG.gridMW!==''&&+CFG.gridMW<=0){const g=it.find(x=>x.k==='계통(변전소)');g.lv='bad';g.d='입력한 여유용량이 0 이하입니다. 계통 보강 전에는 접속이 어렵습니다. '+g.d}
   const order={bad:3,warn:2,ok:1,unk:0};const worst=it.reduce((m,x)=>order[x.lv]>order[m]?x.lv:m,'unk');
   const known=it.filter(x=>x.lv!=='unk').length;
   r.judge={items:it,overall:known<2?'unk':worst};
@@ -711,8 +704,6 @@ function drawResult(r){
   if(a.mode==='old'&&a.road) ring(a.road,'#7a3cc0',`도로 이격 ${a.road}m`);
   if(r.near){
     r.near.houses.slice(0,600).forEach(h=>L.circleMarker([h.lat,h.lon],{radius:h.cluster?5:3.5,color:h.cluster?'#C8372D':'#fff',weight:1.5,fillColor:h.cluster?'#ff8f85':'#C8372D',fillOpacity:.9}).bindTooltip(`${h.kind}${h.cluster?' · 주거밀집(5호+)':''} · ${nf(h.d)}m`).addTo(houseLayer));
-    r.near.subs.slice(0,3).forEach(s=>{L.marker([s.lat,s.lon],{icon:L.divIcon({className:'sub-ico',html:'🏭',iconSize:[20,20]})}).bindTooltip(`${esc(s.name)} ${s.kv} · ${nf(s.d/1000,1)}km`).addTo(judgeLayer)});
-    if(r.near.subs[0]) L.polyline([c,[r.near.subs[0].lat,r.near.subs[0].lon]],{color:'#F2A900',weight:2,dashArray:'2 6'}).addTo(judgeLayer);
     r.near.solars.slice(0,100).forEach(s=>L.circleMarker([s.lat,s.lon],{radius:4,color:'#1a5fb4',weight:1,fillColor:'#62a0ea',fillOpacity:.9}).bindTooltip('기존 태양광'+(s.name?': '+esc(s.name):'')).addTo(judgeLayer));
   }
   if(!$('#lyJudge').checked)map.removeLayer(judgeLayer);if(!$('#lyHouses').checked)map.removeLayer(houseLayer);
@@ -741,7 +732,7 @@ function renderAll(){if(!R)return;$('#intro').style.display='none';render1();ren
 function headHTML(r){const p=r.parcel;return `<p class="addr">${esc(p.addr||`${r.sido} ${r.sgg}`)}</p><p class="sub">${p.jibun?esc(p.jibun)+' · ':''}${p.manual?'필지 경계 없음(위치 기준)':nf(p.area)+'㎡ ('+nf(p.area/PY)+'평)'} · ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}</p>`}
 function render1(){
   const r=R,o=r.judge.overall,f=finance(r);
-  const msg={ok:'주요 조건에서 걸리는 항목이 없습니다. 한전 여유용량과 지자체 허가부서 확인 후 추진할 수 있습니다.',warn:'일부 항목은 지자체·관계기관 협의가 필요합니다. 아래 노란 항목을 먼저 확인하세요.',bad:'설치를 어렵게 만드는 항목이 있습니다. 빨간 항목을 확인하세요.',unk:'자료가 부족해 판정하지 못했습니다. ⚙ 설정에서 브이월드 키를 넣으면 정확해집니다.'}[o];
+  const msg={ok:'주요 조건에서 걸리는 항목이 없습니다. 지자체 허가부서와 한전 계통 확인 후 추진할 수 있습니다.',warn:'일부 항목은 지자체·관계기관 협의가 필요합니다. 아래 노란 항목을 먼저 확인하세요.',bad:'설치를 어렵게 만드는 항목이 있습니다. 빨간 항목을 확인하세요.',unk:'자료가 부족해 판정하지 못했습니다. ⚙ 설정에서 브이월드 키를 넣으면 정확해집니다.'}[o];
   const lamp=['bad','warn','ok'].map(c=>`<i class="${c===o?'on':''}"></i>`).join('');
   $('#r1').innerHTML=headHTML(r)+`<div class="verdict ${o}"><div class="lamp">${lamp}</div><h3>${{ok:'설치 가능성 높음',warn:'조건부 가능·협의 필요',bad:'설치 어려움',unk:'판정 보류'}[o]}</h3><p>${msg}</p></div>`+itemsHTML(r.judge.items)+
   `<div class="big"><div><b class="num">${nf(f.kw)}kW</b><span>설치 가능 용량(추정)</span></div><div><b class="num">${won(f.rev1)}</b><span>첫해 매출</span></div><div><b class="num">${f.payback?nf(f.payback,1)+'년':'–'}</b><span>투자 회수</span></div></div>`+
@@ -750,25 +741,27 @@ function render1(){
 function render2(){
   const r=R,o=r.ord,a=r.applied,n=r.near,t=r.terrain,z=r.zone;
   let h=headHTML(r);
-  h+=`<h4 class="sec">조례 이격거리 · ${esc(r.sido)} ${esc(r.sgg)}</h4><dl class="kv">
+  h+=`<h4 class="sec">조례 이격거리 · ${esc(o&&o.label||r.sido)} ${esc(r.sgg)}</h4><dl class="kv">
    <dt>시군 상태</dt><dd><span style="color:${ST[ordStatus(o)].c}">●</span> ${ST[ordStatus(o)].t}</dd>
-   <dt>조례상 주거 이격</dt><dd>${o&&o.h!=null?nf(o.h)+'m':'미수록'}</dd>
-   <dt>조례상 도로 이격</dt><dd>${o&&o.r!=null?nf(o.r)+'m'+(o.r2?` / ${nf(o.r2)}m`:''):'미수록'}</dd>
+   <dt>조례상 주거 이격</dt><dd>${o&&o.h!=null?(o.h?nf(o.h)+'m':'없음'):'미수록'}</dd>
+   <dt>조례상 도로 이격</dt><dd>${o&&o.r!=null?(o.r?nf(o.r)+'m'+(o.r2?` / ${nf(o.r2)}m`:''):'없음'):'미수록'}</dd>
    <dt>적용 추정(주거)</dt><dd>${a.house!=null?nf(a.house)+'m':'–'}</dd>
    <dt>적용 추정(도로)</dt><dd>${a.mode==='old'&&a.road?nf(a.road)+'m':'적용 안 함'}</dd></dl>
-   <p class="hint">${esc(a.text)}${o&&o.note?' '+esc(o.note)+'.':''}<br>법정 상한: 주거지(주택 5호 이상 밀집) 최대 ${LEGAL.house}m, 도로 이격 금지 (${LEGAL.since} 시행). 자료: ${esc(ordSrcText(o)||'–')}</p>
-   <p class="hint"><a href="https://www.elis.go.kr/" target="_blank" rel="noopener">자치법규정보시스템</a>에서 「${esc(r.sgg)} 도시·군계획 조례」 원문을 확인하세요.${o&&o.clauses?'<br><b>자동 수집 조문</b>: '+o.clauses.slice(0,3).map(esc).join('<br>'):''}</p>`;
+   <p class="hint">${esc(a.text)}${o&&o.note?' '+esc(o.note)+'.':''} 법정 상한: 주거지(주택 5호 이상) 최대 ${LEGAL.house}m, 도로 이격 금지 (${LEGAL.since} 시행).</p>`;
+  if(o&&o.now){h+=`<div class="kv" style="display:block"><b>${esc(o.title||'')}</b> <small style="color:var(--muted)">${esc(o.cls||'')}${o.d?' · '+esc(o.d)+' 개정':''}${o.dept?' · '+esc(o.dept):''}</small>
+     <p style="margin:8px 0 0;font-weight:400;line-height:1.6;font-size:13.5px">${esc(o.now)}</p>
+     ${o.review?`<p style="margin:8px 0 0;font-weight:400;white-space:pre-line;font-size:13px;color:var(--muted)">${esc(o.review)}</p>`:''}
+     ${o.change?`<p style="margin:8px 0 0;font-weight:400;font-size:12.5px;color:var(--muted)"><b>최근 변경</b> ${esc(o.change)}</p>`:''}
+     ${o.url?`<p style="margin:8px 0 0"><a href="${esc(o.url)}" target="_blank" rel="noopener">조례 원문 보기 (자치법규정보시스템)</a></p>`:''}</div>`}
+  h+=`<p class="hint">자료: ${esc(ordSrcText(o)||'조례 정보 미수록')}${o?'':' · <a href="https://www.elis.go.kr/" target="_blank" rel="noopener">자치법규정보시스템</a>에서 원문을 확인하세요.'}</p>`;
   if(n){const cl=n.houses.filter(x=>x.cluster).length;
     h+=`<h4 class="sec">주변 주택·도로 (반경 ${nf(n.Rb)}m)</h4><dl class="kv"><dt>주택(추정) 수</dt><dd>${nf(n.houses.length)}채</dd><dt>주거밀집(100m 안 5호+)에 속한 주택</dt><dd>${nf(cl)}채</dd>
      <dt>가장 가까운 주택</dt><dd>${r.setback&&r.setback.nearAny!=null?nf(r.setback.nearAny)+'m':'–'}</dd><dt>가장 가까운 주거밀집</dt><dd>${r.setback&&r.setback.nearCluster!=null?nf(r.setback.nearCluster)+'m':'–'}</dd>
-     <dt>가장 가까운 주요도로</dt><dd>${n.roads[0]?esc(n.roads[0].name)+' · '+nf(n.roads[0].d)+'m':'–'}</dd><dt>반경 3km 기존 태양광</dt><dd>${nf(n.solars.length)}곳</dd></dl>
+     <dt>가장 가까운 주요도로</dt><dd>${n.roads[0]?esc(n.roads[0].name)+' · '+nf(n.roads[0].d)+'m':'–'}</dd><dt>반경 3km 기존 태양광(OSM)</dt><dd>${nf(n.solars.length)}곳</dd></dl>
      <p class="hint">자료: ${esc(n.src)}. 지도에 빨간 점은 주택, 테두리 진한 점은 주거밀집에 속한 주택입니다. 미등재·신축 주택은 빠질 수 있으니 현장 확인이 필요합니다.</p>`}
   h+=`<h4 class="sec">토지·용도</h4><dl class="kv"><dt>지목</dt><dd>${esc(r.parcel.jimok||'–')}</dd><dt>용도지역</dt><dd>${z?esc(z.names.join(', ')||'미확인'):'–'}</dd><dt>농업진흥구역</dt><dd>${z?(z.jinheung?'해당':'아님'):'–'}</dd><dt>농업보호구역</dt><dd>${z?(z.boho?'해당':'아님'):'–'}</dd><dt>개발제한구역</dt><dd>${z?(z.gb?'해당':'아님'):'–'}</dd><dt>공시지가</dt><dd>${r.parcel.jiga?nf(r.parcel.jiga)+'원/㎡':'–'}</dd></dl>`;
   if(t)h+=`<h4 class="sec">지형</h4><dl class="kv"><dt>평균 경사</dt><dd>${t.slope.toFixed(1)}°</dd><dt>사면향</dt><dd>${t.flat?'평지':aspName(t.aspect)+` (${Math.round(t.aspect)}°)`}</dd><dt>표고</dt><dd>${nf(t.min)}~${nf(t.max)}m</dd></dl>`;
-  if(n&&n.subs.length)h+=`<h4 class="sec">계통 · 가까운 변전소</h4><dl class="kv">${n.subs.slice(0,3).map(s=>`<dt>${esc(s.name)} ${esc(s.kv)}</dt><dd>${nf(s.d/1000,1)}km</dd>`).join('')}</dl>`;
-  h+=`<div class="field"><label for="inGrid">한전 여유용량 직접 입력(MW)</label><input id="inGrid" type="number" step="0.1" value="${esc(CFG.gridMW)}" placeholder="한전ON 조회값"></div><p class="hint"><a href="https://online.kepco.co.kr/" target="_blank" rel="noopener">한전ON</a>의 신재생 접속 가능용량 조회 결과를 넣으면 판정에 반영됩니다.</p>`;
   $('#t2').innerHTML=h;
-  $('#inGrid').onchange=e=>{CFG.gridMW=e.target.value;saveCfg();judge(R);render1()};
 }
 function render3(){
   const r=R,f=finance(r);
@@ -871,26 +864,26 @@ let cadLayer=null,zoneLayer=null;
 function wms(layers,styles,minZoom,op){return L.tileLayer.wms('https://api.vworld.kr/req/wms',{layers,styles,format:'image/png',transparent:true,version:'1.3.0',key:CFG.vkey,domain:CFG.vdomain,minZoom,maxZoom:21,opacity:op,tileSize:512,zIndex:5})}
 $('#lyCad').onchange=e=>{if(!CFG.vkey){e.target.checked=false;toast('연속지적도는 ⚙ 설정에서 브이월드 키를 넣어야 볼 수 있습니다.');return}if(e.target.checked){cadLayer=wms('lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun','lp_pa_cbnd_bubun_line,lp_pa_cbnd_bonbun_line',15,1).addTo(map);if(map.getZoom()<15)toast('지적도는 더 확대하면 보입니다.')}else if(cadLayer)map.removeLayer(cadLayer)};
 $('#lyZone').onchange=e=>{if(!CFG.vkey){e.target.checked=false;toast('용도지역은 ⚙ 설정에서 브이월드 키를 넣어야 볼 수 있습니다.');return}if(e.target.checked){zoneLayer=wms('lt_c_uq111,lt_c_uq112,lt_c_uq113,lt_c_uq114','lt_c_uq111,lt_c_uq112,lt_c_uq113,lt_c_uq114',12,.5).addTo(map)}else if(zoneLayer)map.removeLayer(zoneLayer)};
-const viewLayers={sub:L.layerGroup(),solar:L.layerGroup(),sites:L.layerGroup()};
+const viewLayers={solar:L.layerGroup(),sites:L.layerGroup()};
 let viewTimer=null;
 async function loadView(){
-  const want=[$('#lySub').checked&&'sub',$('#lySolar').checked&&'solar'].filter(Boolean);if(!want.length)return;
-  if(map.getZoom()<10){toast('변전소·발전소 표시는 시·군 단위 이상으로 확대하세요.');return}
+  if(!$('#lySolar').checked)return;
+  if(map.getZoom()<11){toast('기존 발전소 표시는 더 확대하세요.');return}
   const b=map.getBounds(),bb=`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
-  let q='[out:json][timeout:25];(';if(want.includes('sub'))q+=`nwr["power"="substation"](${bb});`;if(want.includes('solar'))q+=`nwr["power"="plant"]["plant:source"="solar"](${bb});nwr["power"="generator"]["generator:source"="solar"]["generator:method"="photovoltaic"](${bb});`;q+=');out center tags 2000;';
-  try{const d=await overpass(q);viewLayers.sub.clearLayers();viewLayers.solar.clearLayers();
+  let q='[out:json][timeout:25];(';q+=`nwr["power"="plant"]["plant:source"="solar"](${bb});nwr["power"="generator"]["generator:source"="solar"]["generator:method"="photovoltaic"](${bb});`;q+=');out center tags 2000;';
+  try{const d=await overpass(q);viewLayers.solar.clearLayers();
     for(const e of d.elements){const c=e.center||{lat:e.lat,lon:e.lon},t=e.tags||{};if(!c.lat)continue;
-      if(t.power==='substation')L.marker([c.lat,c.lon],{icon:L.divIcon({className:'sub-ico',html:'🏭',iconSize:[20,20]})}).bindTooltip(esc(t.name||'변전소')+(t.voltage?` ${String(t.voltage).split(';').map(v=>Math.round(+v/1000)).join('/')}kV`:'')).addTo(viewLayers.sub);
-      else L.circleMarker([c.lat,c.lon],{radius:4,color:'#1a5fb4',weight:1,fillColor:'#62a0ea',fillOpacity:.85}).bindTooltip('태양광'+(t.name?': '+esc(t.name):'')).addTo(viewLayers.solar)}
+      L.circleMarker([c.lat,c.lon],{radius:4,color:'#1a5fb4',weight:1,fillColor:'#62a0ea',fillOpacity:.85}).bindTooltip('태양광'+(t.name?': '+esc(t.name):'')).addTo(viewLayers.solar)}
   }catch(e){toast('주변 현황을 불러오지 못했습니다. 잠시 후 다시 시도하세요.')}
 }
-['sub','solar'].forEach(k=>$('#ly'+(k==='sub'?'Sub':'Solar')).onchange=e=>{if(e.target.checked){viewLayers[k].addTo(map);loadView()}else map.removeLayer(viewLayers[k])});
+$('#lySolar').onchange=e=>{if(e.target.checked){viewLayers.solar.addTo(map);loadView()}else map.removeLayer(viewLayers.solar)};
 map.on('moveend',()=>{clearTimeout(viewTimer);viewTimer=setTimeout(loadView,700)});
-function drawSites(){viewLayers.sites.clearLayers();SITES.forEach(s=>L.circleMarker([s.lat,s.lon],{radius:6,color:'#fff',weight:2,fillColor:'#0F3D2E',fillOpacity:1}).bindTooltip(`<b>${esc(s.name)}</b>${s.kw?'<br>'+nf(s.kw)+'kW':''}${s.type?'<br>'+esc(s.type):''}`).addTo(viewLayers.sites))}
-$('#lySites').onchange=e=>{if(e.target.checked){if(!SITES.length){toast('⚙ 설정에서 시공사례 엑셀을 먼저 불러오세요.');e.target.checked=false;return}drawSites();viewLayers.sites.addTo(map)}else map.removeLayer(viewLayers.sites)};
+const SITE_COL={'태양광':'#F2A900','태양열':'#E8590C','지열':'#1971C2'};
+function drawSites(){viewLayers.sites.clearLayers();SITES.forEach(s=>L.circleMarker([s.lat,s.lon],{radius:5,color:'#0F3D2E',weight:1.5,fillColor:SITE_COL[s.e]||'#0F3D2E',fillOpacity:.95}).bindTooltip(`<b>세명 시공사례</b><br>${esc(s.e||s.type||'')}${s.k?' · '+esc(s.k):''}${s.kw?' · '+nf(s.kw)+'kW':''}${s.area?'<br>'+esc(s.area):''}${s.name?'<br>'+esc(s.name):''}`).addTo(viewLayers.sites))}
+$('#lySites').onchange=e=>{if(e.target.checked){if(!SITES.length){toast('시공사례 자료(data/sites.json)를 불러오지 못했습니다.');e.target.checked=false;return}drawSites();viewLayers.sites.addTo(map)}else map.removeLayer(viewLayers.sites)};
 
 /* ===== 범례 ===== */
-function legend(){$('#legend').onclick=()=>$('#legend').classList.toggle('open');$('#legend').innerHTML=`<b>🗺 범례 <small class="mob" style="font-weight:400;color:#5B6B63">(눌러서 펼치기)</small></b>${Object.values(ST).map(s=>`<div class="row"><i style="background:${s.c}"></i>${s.t}</div>`).join('')}<div class="row"><i style="background:#C8372D;border-radius:50%"></i>주택(추정) · 진한 테두리=주거밀집</div><div class="row"><i style="border:2px dashed #C8372D;background:none"></i>주거 이격 반경</div><div class="row">🏭 변전소 <i style="background:#62a0ea;border-radius:50%;margin-left:6px"></i>기존 태양광</div>`}
+function legend(){$('#legend').onclick=()=>$('#legend').classList.toggle('open');$('#legend').innerHTML=`<b>🗺 범례 <small class="mob" style="font-weight:400;color:#5B6B63">(눌러서 펼치기)</small></b>${Object.values(ST).map(s=>`<div class="row"><i style="background:${s.c}"></i>${s.t}</div>`).join('')}<div class="row"><i style="background:#C8372D;border-radius:50%"></i>주택(추정) · 진한 테두리=주거밀집</div><div class="row"><i style="border:2px dashed #C8372D;background:none"></i>주거 이격 반경</div><div class="row"><i style="background:#62a0ea;border-radius:50%"></i>기존 태양광(OSM)</div><div class="row"><i style="background:#F2A900;border:1.5px solid #0F3D2E;border-radius:50%"></i>세명 시공사례</div>`}
 
 /* ===== 모달 ===== */
 $$('[data-modal]').forEach(b=>b.onclick=()=>$('#'+b.dataset.modal).showModal());
@@ -907,8 +900,8 @@ function staticDialogs(){
   <tr><td>지목</td><td>대·잡종지·공장용지 → 유리 / 전·답·과 → 농지전용 협의 / 임야 → 산지전용·REC 0.5 / 도로·하천 등 공공용지 → 어려움</td></tr>
   <tr><td>경사</td><td>필지 범위 5×5 고도 격자로 평면을 맞춰 평균 경사를 구합니다. 10° 이하 가능, 15° 이하 협의, 임야에서 15° 초과는 어려움</td></tr>
   <tr><td>조례 이격거리</td><td>필지 경계에서 주택까지 거리를 잽니다. 반경 100m 안에 주택이 5채 이상이면 '주거밀집'으로 봅니다. 2026.9.18 시행 국가 상한(주거 최대 200m, 도로 이격 금지)을 적용하되, 기존 조례를 계속 적용한다고 답한 지자체는 조례값으로 판정합니다.</td></tr>
-  <tr><td>계통</td><td>가장 가까운 변전소 거리 10km 이하 가능, 초과 협의. 한전 여유용량을 입력하면 0 이하일 때 어려움</td></tr></table>
-  <p class="hint">조례 데이터 우선순위: 불러온 엑셀 → 국가법령정보 자동수집(data/ordinances.json) → 내장 자료(출처 명시) → 법정 상한 가정.</p>`;
+</table>
+  <p class="hint">계통(한전 변전소·선로 여유용량)은 이 화면에서 판정하지 않습니다. 한전ON에서 따로 확인하세요.<br>조례 데이터 우선순위: 설정에서 불러온 엑셀 → 조례 모니터링 엑셀(data/ordinances.json) → 내장 자료(출처 명시) → 법정 상한 가정.</p>`;
   $('#safetyBody').innerHTML=`<p>태양광 발전설비를 안전하게 운영하기 위해 현장에서 자주 확인하는 항목입니다.</p><dl>
   <dt>접속반·인버터 발열</dt><dd>여름철 고온에서 단자 풀림·과열이 늘어납니다. 열화상 점검으로 단자 온도를 확인하세요.</dd>
   <dt>모듈 핫스팟·파손</dt><dd>그늘, 오염, 셀 균열은 국부 과열을 만듭니다. 드론 열화상 촬영으로 넓은 부지를 빠르게 점검할 수 있습니다.</dd>
@@ -924,8 +917,9 @@ function staticDialogs(){
   <tr><td>시·군 경계</td><td>통계청 센서스 경계(2018, southkorea-maps 오픈데이터) — 군위군은 대구광역시로 반영</td></tr>
   <tr><td>경사·사면향</td><td>Open-Meteo Elevation API(Copernicus DEM 90m)로 5×5 격자 고도를 받아 자체 계산</td></tr>
   <tr><td>일사량</td><td>NASA POWER 기후값(ALLSKY_SFC_SW_DWN, 장기 평균)</td></tr>
-  <tr><td>주택·도로·변전소·태양광</td><td>© OpenStreetMap 기여자(ODbL, Overpass API 실시간 조회) / 브이월드 도로명주소 건물(키 있을 때). 크라우드소싱 자료라 누락이 있을 수 있습니다</td></tr>
-  <tr><td>조례 이격거리</td><td>${Object.values(ORD_SRC).map(esc).join('<br>')}<br>+ 국가법령정보센터 자치법규 API 자동수집(설정 시)</td></tr>
+  <tr><td>주택·도로·기존 태양광</td><td>© OpenStreetMap 기여자(ODbL, Overpass API 실시간 조회) / 브이월드 도로명주소 건물(키 있을 때). 크라우드소싱 자료라 누락이 있을 수 있습니다</td></tr>
+  <tr><td>조례 이격거리</td><td>조례 모니터링 엑셀(자치법규정보시스템 원문 정리, ${esc(ORD_META.updated||'')} 갱신, ${nf(ORD_META.count||0)}개 시·군)<br>보조: ${Object.values(ORD_SRC).map(esc).join(' / ')}</td></tr>
+  <tr><td>세명 시공사례</td><td>세명 시공지도 외부공유용 자료(개인정보·사업비 제외)</td></tr>
   <tr><td>법정 상한</td><td>${esc(LEGAL.basis)}, ${LEGAL.since} 시행</td></tr>
   <tr><td>SMP·REC 기본값</td><td>전력거래소 계통한계가격·신재생원스톱 현물시장(2026년 10월 3주차 육지 평균)</td></tr></table>
   <p class="hint">모든 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 인허가는 관계기관 확인이 필요합니다.</p>`;
@@ -950,19 +944,25 @@ $('#ordFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{cons
  }catch(err){ordStatusText('파일을 읽지 못했습니다: '+err.message)}e.target.value=''};
 $('#ordTemplate').onclick=()=>{const ws=XLSX.utils.aoa_to_sheet([['시도','시군','주거(m)','도로(m)','처리방침','비고','기준일'],['충청남도','아산시','','','상한적용','조례 원문 확인 후 입력','2026-11-02']]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'조례');XLSX.writeFile(wb,'조례_이격거리_양식.xlsx')};
 $('#ordClear').onclick=()=>{ORD_USER={};LS.set('sms.ord',{});buildSgg();ordStatusText('불러온 데이터를 지웠습니다.')};
-$('#ordView').onclick=()=>{const keys=new Set([...Object.keys(ORD_BUILTIN),...Object.keys(ORD_AUTO),...Object.keys(ORD_USER)]);const rows=[...keys].sort().map(k=>{const [s,g]=k.split('|');const o=ordFor(s,g);return `<tr><td>${esc(s)}</td><td>${esc(g)}</td><td>${o.h!=null?nf(o.h):''}</td><td>${o.r!=null?nf(o.r):''}${o.r2?'/'+nf(o.r2):''}</td><td><span style="color:${ST[ordStatus(o)].c}">●</span> ${ST[ordStatus(o)].t}</td><td>${esc(o.origin==='user'?'엑셀':o.origin==='auto'?'자동수집':'내장')}</td><td>${esc(o.d||'')}</td></tr>`}).join('');$('#ordTable').innerHTML=`<table><tr><th>시도</th><th>시군</th><th>주거</th><th>도로</th><th>상태</th><th>출처</th><th>기준</th></tr>${rows}</table>`;$('#dlgOrd').showModal()};
-function ordStatusText(t){$('#ordStatus').textContent=t||`불러온 시·군 ${Object.keys(ORD_USER).length}곳 · 자동수집 ${Object.keys(ORD_AUTO).length}곳 · 내장 ${Object.keys(ORD_BUILTIN).length}곳`}
+$('#ordView').onclick=()=>{const keys=new Set([...Object.keys(ORD_BUILTIN),...Object.keys(ORD_AUTO),...Object.keys(ORD_USER)]);const rows=[...keys].sort().map(k=>{const [s,g]=k.split('|');const o=ordFor(s,g);return `<tr><td>${esc(s)}</td><td>${esc(g)}</td><td>${o.h!=null?nf(o.h):''}</td><td>${o.r!=null?nf(o.r):''}${o.r2?'/'+nf(o.r2):''}</td><td><span style="color:${ST[ordStatus(o)].c}">●</span> ${ST[ordStatus(o)].t}</td><td>${esc(o.origin==='user'?'직접 불러옴':o.origin==='excel'?'모니터링 엑셀':'내장')}</td><td>${esc(o.d||'')}</td></tr>`}).join('');$('#ordTable').innerHTML=`<table><tr><th>시도</th><th>시군</th><th>주거</th><th>도로</th><th>상태</th><th>출처</th><th>기준</th></tr>${rows}</table>`;$('#dlgOrd').showModal()};
+function ordStatusText(t){$('#ordStatus').textContent=t||`직접 불러온 시·군 ${Object.keys(ORD_USER).length}곳 · 조례 모니터링 엑셀 ${Object.keys(ORD_AUTO).length}곳(${ORD_META.updated||'미적재'}) · 내장 ${Object.keys(ORD_BUILTIN).length}곳`}
 $('#siteFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const rows=await readSheet(f);SITES=rows.map(r=>({name:String(pick(r,['현장명','현장','발전소명','명칭'])||'시공 현장'),lat:num(pick(r,['위도','lat'])),lon:num(pick(r,['경도','lon','lng'])),kw:num(pick(r,['용량','kW'])),type:String(pick(r,['구분','유형'])||'')})).filter(s=>s.lat&&s.lon&&s.lat>32&&s.lat<39.5&&s.lon>124&&s.lon<132);LS.set('sms.sites',SITES);siteStatusText(`${SITES.length}곳을 불러왔습니다.`);$('#lySites').checked=true;drawSites();viewLayers.sites.addTo(map)}catch(err){siteStatusText('파일을 읽지 못했습니다: '+err.message)}e.target.value=''};
-$('#siteClear').onclick=()=>{SITES=[];LS.set('sms.sites',[]);viewLayers.sites.clearLayers();siteStatusText('지웠습니다.')};
+$('#siteClear').onclick=()=>{LS.set('sms.sites',[]);siteStatusText('직접 불러온 자료를 지웠습니다. 새로고침하면 기본 시공사례로 돌아갑니다.')};
 function siteStatusText(t){$('#siteStatus').textContent=t||`저장된 시공사례 ${SITES.length}곳`}
 
 /* ===== 기타 ===== */
 function toast(t){const d=document.createElement('div');d.textContent=t;d.setAttribute('role','status');Object.assign(d.style,{position:'fixed',left:'50%',bottom:'30px',transform:'translateX(-50%)',background:'#0F3D2E',color:'#fff',padding:'10px 16px',borderRadius:'10px',zIndex:2000,fontSize:'14px',boxShadow:'0 6px 20px rgba(0,0,0,.3)',maxWidth:'90vw'});document.body.appendChild(d);setTimeout(()=>d.remove(),3200)}
-function keyNotice(){$('#keyNotice').innerHTML=CFG.vkey?'브이월드 키가 연결되어 필지 경계·지목·용도지역까지 분석합니다.':'지금은 브이월드 키 없이 <b>위치 기준</b>으로 분석합니다(경사·일사량·주택 거리·변전소·조례). <button class="linkbtn" onclick="document.getElementById(\'btnSettings\').click()">⚙ 설정에서 키를 넣으면</button> 필지 경계·지목·용도지역·농업진흥지역까지 자동 판정합니다.'}
+function keyNotice(){$('#keyNotice').innerHTML=CFG.vkey?'필지를 누르면 브이월드에서 필지 경계·지목·용도지역·농업진흥지역을 불러와 함께 판정합니다. 한전 계통 여유용량은 판정에 포함하지 않으니 한전ON에서 따로 확인하세요.':'지금은 브이월드 키 없이 <b>위치 기준</b>으로 분석합니다(경사·일사량·주택 거리·변전소·조례). <button class="linkbtn" onclick="document.getElementById(\'btnSettings\').click()">⚙ 설정에서 키를 넣으면</button> 필지 경계·지목·용도지역·농업진흥지역까지 자동 판정합니다.'}
 $$('.tabs button').forEach(b=>b.onclick=()=>{$$('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));$$('.tabpane').forEach(p=>p.classList.toggle('on',p.id===b.dataset.tab));if(b.dataset.tab==='t3'&&R)render3();if(innerWidth<=820)$('#panel').classList.add('full')});
 $('.brand').addEventListener('dblclick',()=>$('#panel').classList.toggle('full'));
 $('#map').addEventListener('pointerdown',()=>$('#panel').classList.remove('full'));
-async function loadAuto(){try{const r=await fetch('data/ordinances.json',{cache:'no-cache'});if(r.ok){const d=await r.json();ORD_AUTO=d.items||d;buildSgg();}}catch(e){}}
+async function getData(p){try{const r=await fetch(p,{cache:'no-cache'});return r.ok?await r.json():null}catch(e){return null}}
+async function loadAuto(){
+  const [o,s,p]=await Promise.all([getData('data/ordinances.json'),getData('data/sites.json'),getData('data/prices.json')]);
+  if(o){ORD_AUTO=o.items||{};ORD_META=o;buildSgg();staticDialogs();if(R){R.ord=ordFor(R.sido,R.sgg);R.applied=applied(R.ord);judge(R);renderAll()}}
+  if(s&&s.items&&!LS.get('sms.sites',[]).length){SITES=s.items;if($('#lySites').checked){drawSites();viewLayers.sites.addTo(map)}}
+  if(p){const user=LS.get('sms.cfg',{});BASE={...DEF,...p};CFG={...BASE,...user};}
+}
 
 /* ===== 시작 ===== */
 buildSgg();legend();staticDialogs();render5();keyNotice();loadAuto();

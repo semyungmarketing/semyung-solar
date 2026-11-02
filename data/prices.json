@@ -1,0 +1,16 @@
+{
+ "_설명": "수익분석 기본값. 숫자만 바꾸면 사이트에 반영됩니다. smp·fixed: 원/kWh, rec: 원/REC, cost: 원/kW, om: 원/kW·년, insur·loan·rate·degr: %, loanYears·years: 년, pyeongPerKw: 1kW당 필요 면적(평)",
+ "_기준": "SMP·REC: 2026년 10월 3주차 육지 평균(전력거래소·신재생원스톱)",
+ "smp": 114,
+ "rec": 71400,
+ "fixed": 0,
+ "cost": 1250000,
+ "om": 25000,
+ "insur": 0.3,
+ "loan": 70,
+ "rate": 4.8,
+ "loanYears": 15,
+ "years": 20,
+ "pyeongPerKw": 4,
+ "degr": 0.5
+}
