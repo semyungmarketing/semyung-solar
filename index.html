@@ -675,16 +675,19 @@ async function stepGrid(r){
   const a=parseAddr(p.addr);const jb=(p.jibunNo||a.jibun||'').replace(/\s+/g,'');
   const q=new URLSearchParams({metroCd:String(p.pnu).slice(0,2),cityCd:String(p.pnu).slice(2,5)});
   if(a.emd)q.set('addrLidong',a.emd);if(a.li)q.set('addrLi',a.li);if(jb)q.set('addrJibun',jb);
-  const ck=q.toString();let d=GRID_CACHE.get(ck);
-  if(!d){
-    let url;if(CFG.kepcoProxy){url=CFG.kepcoProxy.replace(/\/$/,'')+'?'+ck}else if(KEPCO_KEY){url='https://bigdata.kepco.co.kr/openapi/v1/dispersedGeneration.do?'+ck+'&returnType=json&apiKey='+encodeURIComponent(KEPCO_KEY)}else throw new Error('한전 연결 미설정');
-    try{d=await fetchJSON(url,{},10000)}catch(e){throw new Error(CFG.kepcoProxy?'한전 조회 실패('+e.message+')':'브라우저에서 한전 직접 조회가 막혔습니다. 프록시 주소를 설정하세요')}
-    GRID_CACHE.set(ck,d);
-  }
-  const list=Array.isArray(d)?d:(d.data||d.list||[]);
+  const call=async(qq)=>{const ck=qq.toString();let d=GRID_CACHE.get(ck);if(d)return d;
+    let url;if(CFG.kepcoProxy){url=CFG.kepcoProxy.replace(/\/$/,'')+'/?'+ck}else if(KEPCO_KEY){url='https://bigdata.kepco.co.kr/openapi/v1/dispersedGeneration.do?'+ck+'&returnType=json&apiKey='+encodeURIComponent(KEPCO_KEY)}else throw new Error('한전 연결 미설정');
+    try{d=await fetchJSON(url,{},10000)}catch(e){if(/HTTP 404/.test(e.message)){d={data:[],errCd:'404'};GRID_CACHE.set(ck,d);return d}throw new Error(CFG.kepcoProxy?'한전 조회 실패('+e.message+')':'브라우저에서 한전 직접 조회가 막혔습니다. 프록시 주소를 설정하세요')}
+    GRID_CACHE.set(ck,d);return d};
+  const rows=d=>Array.isArray(d)?d:(d&&(d.data||d.list))||[];
+  // 지번으로 정확히 찾고, 없으면 리 단위, 그다음 읍면동 단위로 넓혀 조회
+  let d=await call(q),level='지번';
+  if(!rows(d).length&&q.get('addrJibun')){q.delete('addrJibun');d=await call(q);level='리'}
+  if(!rows(d).length&&q.get('addrLi')){q.delete('addrLi');d=await call(q);level='읍면동'}
+  const list=rows(d);
   const items=list.map(x=>({sub:x.substNm,subCd:x.substCd,mtr:x.mtrNo,dl:x.dlNm,dlCd:x.dlCd,subCum:numv(x.substPwr),mtrCum:numv(x.mtrPwr),dlCum:numv(x.dlPwr),v1:numv(x.vol1),v2:numv(x.vol2),v3:numv(x.vol3)}));
   items.forEach(x=>{const v=[x.v1,x.v2,x.v3].filter(y=>y!=null);x.avail=v.length?Math.min(...v):null});
-  r.grid={items,query:Object.fromEntries(q),raw:DEBUG?d:undefined};
+  r.grid={items,level,query:Object.fromEntries(q),raw:DEBUG?d:undefined};
   if(!items.length)return '해당 주소 선로 정보 없음';
   const best=Math.max(...items.map(x=>x.avail??-1e9));
   return best>-1e9?`여유 ${nf(best)}kW`:`선로 ${items.length}건`;
@@ -789,7 +792,7 @@ function judge(r){
    else if(r.grid&&r.grid.items.length){const av=r.grid.items.filter(x=>x.avail!=null).sort((a,b)=>b.avail-a.avail);
      if(!av.length)g={k:'계통(한전 여유용량)',v:'여유 미표기',lv:'warn',d:`${r.grid.items[0].sub||''} 변전소 ${r.grid.items[0].dl||''} 선로가 조회됐지만 여유용량 값이 비어 있습니다. 한전ON에서 확인하세요.`};
      else{const b=av[0];const lv=b.avail<=0?'bad':b.avail<kw?'warn':'ok';
-       g={k:'계통(한전 여유용량)',v:`${nf(b.avail)}kW`,lv,d:`${b.sub||''} 변전소 ${b.mtr?b.mtr+'번 변압기 ':''}${b.dl||''} 선로 기준. 변전소·변압기·선로 여유 중 가장 작은 값입니다. `+(lv==='ok'?`예상 용량 ${nf(kw)}kW를 접속할 여유가 있습니다.`:lv==='warn'?`예상 용량 ${nf(kw)}kW보다 여유가 작아 용량 조정이나 계통 보강 협의가 필요합니다.`:'여유가 없어 계통 보강 전에는 접속이 어렵습니다.')+' 한전 표기 기준이며 접수 순서에 따라 바뀝니다.'}}}
+       g={k:'계통(한전 여유용량)',v:`${nf(b.avail)}kW`,lv,d:(r.grid.level!=='지번'?`(${r.grid.level} 단위 조회 결과 중 여유가 가장 큰 선로) `:'')+`${b.sub||''} 변전소 ${b.mtr?b.mtr+'번 변압기 ':''}${b.dl||''} 선로 기준. 변전소·변압기·선로 여유 중 가장 작은 값입니다. `+(lv==='ok'?`예상 용량 ${nf(kw)}kW를 접속할 여유가 있습니다.`:lv==='warn'?`예상 용량 ${nf(kw)}kW보다 여유가 작아 용량 조정이나 계통 보강 협의가 필요합니다.`:'여유가 없어 계통 보강 전에는 접속이 어렵습니다.')+' 한전 표기 기준이며 접수 순서에 따라 바뀝니다.'}}}
    else if(r.grid)g={k:'계통(한전 여유용량)',v:'정보 없음',lv:'unk',d:'이 주소로 조회된 선로 정보가 없습니다. 한전ON에서 확인하세요.'+saTxt};
    else g={k:'계통(한전 여유용량)',v:sa?sa.join(', '):'미확인',lv:'unk',d:(r.err&&r.err.grid?r.err.grid+'. ':CFG.kepcoProxy||KEPCO_KEY?'':'⚙ 설정에서 한전 연결(프록시 주소)을 넣으면 여유용량을 조회합니다. ')+saTxt};
    it.push(g);}
@@ -871,7 +874,7 @@ function render2(){
   {const g=r.grid,sa=substArea(r);
    h+=`<h4 class="sec">계통 · 한전 분산전원연계 정보</h4>`;
    if(g&&g.items.length)h+=`<div class="tblwrap"><table style="width:100%;font-size:12.5px;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:8px"><thead><tr><th>변전소</th><th>변압기</th><th>선로(DL)</th><th>변전소 여유</th><th>변압기 여유</th><th>선로 여유</th></tr></thead><tbody>${g.items.map(x=>`<tr><td>${esc(x.sub||'')}</td><td>${esc(x.mtr||'')}</td><td>${esc(x.dl||'')}</td><td class="num">${x.v1!=null?nf(x.v1):'–'}</td><td class="num">${x.v2!=null?nf(x.v2):'–'}</td><td class="num">${x.v3!=null?nf(x.v3):'–'}</td></tr>`).join('')}</tbody></table></div>
-     <p class="hint">단위 kW(한전 표기). 누적 연계용량: ${g.items.slice(0,3).map(x=>`${esc(x.sub||'')} ${nf(x.subCum)} / ${esc(x.dl||'')} ${nf(x.dlCum)}`).join(', ')}. 조회 주소: ${esc(Object.values(g.query).join(' '))}</p>`;
+     <p class="hint">${g.level!=='지번'?`지번으로는 조회되지 않아 <b>${g.level} 단위</b> 선로 전체를 보여줍니다. `:''}단위 kW. 선로(DL) 한도 12,000kW·변압기 한도 50,000kW 기준으로 한전이 계산한 여유입니다. 누적 연계용량: ${g.items.slice(0,3).map(x=>`${esc(x.sub||'')} ${nf(x.subCum)} / ${esc(x.dl||'')} ${nf(x.dlCum)}`).join(', ')}. 조회 주소: ${esc(Object.values(g.query).join(' '))}</p>`;
    else h+=`<p class="hint">${r.gridPending?'조회 중입니다.':r.grid?'이 주소로 조회된 선로 정보가 없습니다.':esc((r.err&&r.err.grid)||'한전 연결이 설정되지 않았습니다.')}${sa?` 공급 변전소(2024.5 자료): <b>${esc(sa.join(', '))}</b>`:''}</p>`;
    h+=`<p class="hint"><a href="https://online.kepco.co.kr/" target="_blank" rel="noopener">한전ON</a>에서 최신 접속 가능 여부를 확인하세요.</p>`}
   h+=`<h4 class="sec">토지·용도</h4><dl class="kv"><dt>지목</dt><dd>${esc(r.parcel.jimok||'–')}</dd><dt>용도지역</dt><dd>${z?esc(z.names.join(', ')||'미확인'):'–'}</dd><dt>농업진흥구역</dt><dd>${z?(z.jinheung?'해당':'아님'):'–'}</dd><dt>농업보호구역</dt><dd>${z?(z.boho?'해당':'아님'):'–'}</dd><dt>개발제한구역</dt><dd>${z?(z.gb?'해당':'아님'):'–'}</dd><dt>공시지가</dt><dd>${r.parcel.jiga?nf(r.parcel.jiga)+'원/㎡':'–'}</dd></dl>`;
