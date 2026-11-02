@@ -112,7 +112,9 @@ async function admin(request, env, url) {
   }
   if (url.pathname === "/admin/delete" && request.method === "POST") {
     const id = parseInt(url.searchParams.get("id"), 10);
+    const phone = (url.searchParams.get("phone") || "").replace(/[^0-9]/g, "");
     if (id) await env.DB.prepare("DELETE FROM leads WHERE id = ?").bind(id).run();
+    else if (phone) await env.DB.prepare("DELETE FROM leads WHERE phone = ?").bind(phone).run();
     return json({ ok: true }, 200, noStore);
   }
   return new Response(ADMIN_HTML, { headers: { ...noStore, "Content-Type": "text/html; charset=utf-8" } });
@@ -130,20 +132,24 @@ th{background:#EEF2EF}td.del button{border:1px solid #C8372D;color:#C8372D;backg
 .note{font-size:12.5px;color:#5B6B63;margin-top:10px;line-height:1.6}</style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script></head><body>
 <header><h1>세명 태양광 부지진단 · 이용자 명단</h1><span id="cnt"></span><button class="btn" id="xl">엑셀 다운로드</button></header>
-<main><input type="search" id="q" placeholder="이름·연락처·지역 검색">
-<table><thead><tr><th>번호</th><th>등록일시</th><th>이름</th><th>연락처</th><th>이용 목적</th><th>관심 지역</th><th>마케팅 수신</th><th></th></tr></thead><tbody id="tb"></tbody></table>
-<p class="note">이 명단은 개인정보입니다. 화면 캡처·외부 공유를 하지 말고, 내려받은 엑셀은 업무 후 삭제하세요. 등록 후 1년이 지난 정보는 자동으로 삭제됩니다. 이용자가 삭제를 요청하면 해당 줄의 [삭제]를 누르세요.</p></main>
+<main><input type="search" id="q" placeholder="이름·연락처·지역 검색"> <label style="margin-left:12px;font-size:14px"><input type="checkbox" id="grp" checked> 같은 번호 묶어 보기</label>
+<table><thead id="th"></thead><tbody id="tb"></tbody></table>
+<p class="note">이 명단은 개인정보입니다. 화면 캡처·외부 공유를 하지 말고, 내려받은 엑셀은 업무 후 삭제하세요. 이용자는 하루에 한 번 다시 등록하므로 같은 번호가 여러 번 쌓입니다. "같은 번호 묶어 보기"를 켜면 한 사람당 한 줄로 보입니다. 등록 후 1년이 지난 기록은 자동 삭제됩니다. 이용자가 삭제를 요청하면 [삭제]를 누르세요(묶어 보기에서는 그 번호의 기록이 모두 삭제됩니다).</p></main>
 <script>
 let rows=[];const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=p=>p.length===11?p.replace(/(\\d{3})(\\d{4})(\\d{4})/,'$1-$2-$3'):p.replace(/(\\d{3})(\\d{3})(\\d{4})/,'$1-$2-$3');
+const $=id=>document.getElementById(id);
 async function load(){rows=await (await fetch('/admin/data',{cache:'no-store'})).json();draw()}
-function draw(){const q=document.getElementById('q').value.trim();const list=rows.filter(r=>!q||[r.name,r.phone,r.region,r.purpose].join(' ').includes(q.replace(/-/g,'')));
-document.getElementById('cnt').textContent='총 '+rows.length+'명';
-document.getElementById('tb').innerHTML=list.map(r=>'<tr><td>'+r.id+'</td><td>'+esc(r.created)+'</td><td>'+esc(r.name)+'</td><td>'+fmt(r.phone)+'</td><td>'+esc(r.purpose)+'</td><td>'+esc(r.region)+'</td><td>'+(r.agree_marketing?'동의':'-')+'</td><td class="del"><button data-id="'+r.id+'">삭제</button></td></tr>').join('');
-document.querySelectorAll('td.del button').forEach(b=>b.onclick=async()=>{if(!confirm('이 이용자 정보를 영구 삭제할까요?'))return;await fetch('/admin/delete?id='+b.dataset.id,{method:'POST'});load()})}
-document.getElementById('q').oninput=draw;
-document.getElementById('xl').onclick=()=>{const data=rows.map(r=>({'번호':r.id,'등록일시':r.created,'이름':r.name,'연락처':fmt(r.phone),'이용 목적':r.purpose,'관심 지역':r.region,'마케팅 수신 동의':r.agree_marketing?'동의':'미동의','동의서 버전':r.policy_version}));
-const ws=XLSX.utils.json_to_sheet(data);ws['!cols']=[{wch:6},{wch:19},{wch:10},{wch:15},{wch:16},{wch:18},{wch:14},{wch:12}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'이용자');
+function grouped(){const m=new Map();for(const r of rows){const g=m.get(r.phone);if(!g)m.set(r.phone,{...r,count:1,first:r.created,last:r.created});else{g.count++;g.first=r.created}}return [...m.values()]}
+function view(){const q=$('q').value.trim().replace(/-/g,'');const list=$('grp').checked?grouped():rows.map(r=>({...r,count:1,first:r.created,last:r.created}));return list.filter(r=>!q||[r.name,r.phone,r.region,r.purpose].join(' ').includes(q))}
+function draw(){const g=$('grp').checked,list=view();
+$('cnt').textContent=g?('총 '+grouped().length+'명 (등록 '+rows.length+'건)'):('등록 '+rows.length+'건');
+$('th').innerHTML='<tr>'+(g?'<th>최근 등록</th><th>이름</th><th>연락처</th><th>등록 횟수</th><th>최초 등록</th>':'<th>번호</th><th>등록일시</th><th>이름</th><th>연락처</th>')+'<th>이용 목적</th><th>관심 지역</th><th>마케팅 수신</th><th></th></tr>';
+$('tb').innerHTML=list.map(r=>'<tr>'+(g?'<td>'+esc(r.last)+'</td><td>'+esc(r.name)+'</td><td>'+fmt(r.phone)+'</td><td>'+r.count+'회</td><td>'+esc(r.first)+'</td>':'<td>'+r.id+'</td><td>'+esc(r.created)+'</td><td>'+esc(r.name)+'</td><td>'+fmt(r.phone)+'</td>')+'<td>'+esc(r.purpose)+'</td><td>'+esc(r.region)+'</td><td>'+(r.agree_marketing?'동의':'-')+'</td><td class="del"><button data-id="'+r.id+'" data-phone="'+r.phone+'">삭제</button></td></tr>').join('');
+document.querySelectorAll('td.del button').forEach(b=>b.onclick=async()=>{const all=$('grp').checked;if(!confirm(all?'이 번호의 모든 기록을 영구 삭제할까요?':'이 기록을 영구 삭제할까요?'))return;await fetch('/admin/delete?'+(all?'phone='+b.dataset.phone:'id='+b.dataset.id),{method:'POST'});load()})}
+$('q').oninput=draw;$('grp').onchange=draw;
+$('xl').onclick=()=>{const g=$('grp').checked;const data=view().map(r=>g?{'최근 등록':r.last,'이름':r.name,'연락처':fmt(r.phone),'등록 횟수':r.count,'최초 등록':r.first,'이용 목적':r.purpose,'관심 지역':r.region,'마케팅 수신 동의(최근)':r.agree_marketing?'동의':'미동의'}:{'번호':r.id,'등록일시':r.created,'이름':r.name,'연락처':fmt(r.phone),'이용 목적':r.purpose,'관심 지역':r.region,'마케팅 수신 동의':r.agree_marketing?'동의':'미동의','동의서 버전':r.policy_version});
+const ws=XLSX.utils.json_to_sheet(data);ws['!cols']=Object.keys(data[0]||{}).map(()=>({wch:16}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,g?'이용자(묶음)':'등록기록');
 const d=new Date();XLSX.writeFile(wb,'부지진단_이용자_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.xlsx')};
 load();
 </script></body></html>`;

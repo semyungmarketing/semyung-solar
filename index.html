@@ -308,7 +308,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
 <dialog id="dlgAgree" aria-labelledby="gateTitle">
   <header><h3 id="gateTitle">☀️ 세명 태양광 부지진단 이용 신청</h3></header>
   <form id="gateForm" class="mb" novalidate>
-    <p style="margin-top:0">무료로 이용하실 수 있습니다. 이용자 확인을 위해 아래 정보를 입력해 주세요.</p>
+    <p style="margin-top:0">무료로 이용하실 수 있습니다. 이용자 확인을 위해 아래 정보를 입력해 주세요. 하루에 한 번 다시 확인합니다.</p>
     <div class="field"><label for="gName">이름 <b style="color:var(--bad)">*</b></label><input id="gName" autocomplete="name" maxlength="30" style="text-align:left" required></div>
     <div class="field"><label for="gPhone">휴대폰 번호 <b style="color:var(--bad)">*</b></label><input id="gPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" maxlength="13" style="text-align:left" required></div>
     <div class="field"><label for="gPurpose">이용 목적 (선택)</label><select id="gPurpose"><option value="">선택 안 함</option><option>내 땅 태양광 검토</option><option>건물 지붕 태양광 검토</option><option>발전사업 검토</option><option>기타</option></select></div>
@@ -727,7 +727,7 @@ let busy=false;
 const RESULT_CACHE=new Map();
 async function analyze(ll,drawn){
   if(busy)return;
-  if(!leadDone()){$('#dlgAgree').showModal();return}
+  if(!leadDone()){prefillGate();$('#dlgAgree').showModal();return}
   const lat=ll.lat,lon=ll.lng;
   const sg=findSgg(lat,lon);
   if(!sg){toast('국내 육지 필지를 선택하세요.');return}
@@ -1038,7 +1038,10 @@ $$('[data-modal]').forEach(b=>b.onclick=()=>$('#'+b.dataset.modal).showModal());
 $$('dialog [data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d&&d.id!=='dlgAgree')d.close()}));
 const POLICY_VER='2026-11-02';
-const leadDone=()=>{try{return localStorage.getItem('sms.lead')===POLICY_VER}catch(e){return false}};
+const LEAD_TTL=24*60*60*1000; // 하루마다 다시 묻기
+const leadDone=()=>{try{const o=JSON.parse(localStorage.getItem('sms.lead')||'null');return !!o&&o.v===POLICY_VER&&Date.now()-o.t<LEAD_TTL}catch(e){return false}};
+function prefillGate(){try{const o=JSON.parse(localStorage.getItem('sms.leadInfo')||'null');if(o){$('#gName').value=o.name||'';$('#gPhone').value=o.phone||'';$('#gPhone').dispatchEvent(new Event('input'))}}catch(e){}}
+setInterval(()=>{if(!leadDone()&&!$('#dlgAgree').open){prefillGate();$('#dlgAgree').showModal()}},60*1000);
 $('#cAll').onchange=e=>$$('.cc').forEach(c=>c.checked=e.target.checked);
 $$('.cc').forEach(c=>c.onchange=()=>$('#cAll').checked=$$('.cc').every(x=>x.checked));
 $('#gPhone').oninput=e=>{const d=e.target.value.replace(/\D/g,'').slice(0,11);e.target.value=d.length>7?d.replace(/(\d{3})(\d{3,4})(\d{4})/,'$1-$2-$3'):d.length>3?d.slice(0,3)+'-'+d.slice(3):d};
@@ -1051,7 +1054,7 @@ $('#gateForm').onsubmit=async e=>{e.preventDefault();const msg=$('#gMsg');msg.te
   try{const base=(CFG.kepcoProxy||'').replace(/\/$/,'');if(!base)throw new Error('등록 서버가 설정되지 않았습니다');
     const r=await fetch(base+'/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,purpose:$('#gPurpose').value,region:$('#gRegion').value.trim(),website:$('#gWebsite').value,agreeRequired:true,agreeAge:true,agreeMarketing:$('#cMkt').checked,policyVersion:POLICY_VER})});
     const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));
-    localStorage.setItem('sms.lead',POLICY_VER);$('#dlgAgree').close();toast('등록됐습니다. 지도에서 분석할 땅을 눌러 보세요.');
+    localStorage.setItem('sms.lead',JSON.stringify({v:POLICY_VER,t:Date.now()}));try{localStorage.setItem('sms.leadInfo',JSON.stringify({name,phone}))}catch(e){};$$('.cc').forEach(c=>c.checked=false);$('#cAll').checked=false;$('#dlgAgree').close();toast('등록됐습니다. 지도에서 분석할 땅을 눌러 보세요.');
   }catch(err){msg.textContent='등록하지 못했습니다: '+err.message+' 잠시 후 다시 시도해 주세요.'}
   finally{btn.disabled=false;btn.textContent='동의하고 시작하기'}};
 $('#dlgAgree').addEventListener('cancel',e=>e.preventDefault());
@@ -1129,7 +1132,7 @@ async function loadAuto(){
 
 /* ===== 시작 ===== */
 buildSgg();legend();staticDialogs();render5();keyNotice();loadAuto();
-if(!leadDone())$('#dlgAgree').showModal();
+if(!leadDone()){prefillGate();$('#dlgAgree').showModal()}
 
 </script>
 </body>
