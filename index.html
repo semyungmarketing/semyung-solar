@@ -596,35 +596,51 @@ async function stepSun(r){
 const NONRES=/^(industrial|commercial|retail|warehouse|barn|greenhouse|shed|garage|garages|church|school|farm_auxiliary|cowshed|stable|roof|container|public|office|hangar|service|construction|kindergarten|hospital|university|college|train_station|transportation|parking|sty|carport|toilets|storage_tank|silo|hut|ruins|bunker|manufacture|government|civic|sports_hall|temple|chapel|mosque|shrine|factory|power|water_tower|tower|bridge)$/;
 const RES=/^(house|detached|residential|apartments|semidetached_house|terrace|bungalow|farm|dormitory|static_caravan)$/;
 const NEAR_CACHE=new Map();
-/* 주변 건물·도로 원자료: 브이월드 건물(빠름)을 먼저, 없을 때만 OSM. 도로는 도로 이격을 계속 적용하는 지자체에서만 조회 */
+const DEBUG=/debug/.test(location.search);
+const NAME_APT=/(빌라?|빌리지|맨션|아파트|연립|다세대|기숙사|타운|하우스|원룸|오피스텔|캐슬|팰리스|파크|힐스?)(\s*[0-9가-힣]{0,3}동)?$/;
+const NAME_HOUSE=/(주택|전원주택|농가)$/;
+function classifyVW(p){
+  let code='';for(const [k,v] of Object.entries(p)){if(/typ|use|purps|bdtyp|_cd$/i.test(k)&&/^\d{5}$/.test(String(v))){code=String(v);break}}
+  const name=String(p.buld_nm||p.bd_nm||p.bldg_nm||p.buld_nm_dc||p.bld_nm||'').trim();
+  if(/^02/.test(code)||NAME_APT.test(name))return{kind:'공동주택',name};
+  if(/^01/.test(code)||NAME_HOUSE.test(name))return{kind:'단독주택',name};
+  if(code)return null;
+  return{kind:'건물(용도 미상)',name};
+}
+/* 주변 건물: 브이월드 건물과 OSM을 동시에 요청해 합칩니다. 공동주택(빌라 등)은 한 동을 5호로 봅니다 */
 async function fetchNear(r){
   const a=r.applied,Rb=Math.min(Math.max(a.house||0,200)+100,1100);
   const needRoad=a.mode==='old'&&(a.road>0||a.road2>0),Rr=Math.min(Math.max(a.road||0,a.road2||0)+100,1100);
   const ck=`${r.lat.toFixed(4)},${r.lon.toFixed(4)},${Rb},${needRoad?Rr:0}`;if(NEAR_CACHE.has(ck))return NEAR_CACHE.get(ck);
-  let bld=[],roads=[],src=[];
-  const vw=CFG.vkey?(async()=>{const pad=Rb/111000;const fs=await vwData('LT_C_SPBD',`BOX(${r.lon-pad*1.25},${r.lat-pad},${r.lon+pad*1.25},${r.lat+pad})`,1000);
-      return fs.map(f=>{const p=f.properties||{};const code=String(p.bdtyp_cd||p.bd_typ_cd||p.bdtyp||'');if(code&&!/^0[12]/.test(code))return null;const c=turf.centroid(f).geometry.coordinates;return{lat:c[1],lon:c[0],kind:code?'주택(건물정보)':'건물(용도 미상)'}}).filter(Boolean)})():Promise.reject();
-  const osm=async(withB)=>{if(!withB&&!needRoad)return{elements:[]};
-      let q='[out:json][timeout:10];';if(withB)q+=`(way["building"](around:${Rb},${r.lat},${r.lon});node["building"](around:${Rb},${r.lat},${r.lon}););out center tags 3000;`;
-      if(needRoad)q+=`way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"](around:${Rr},${r.lat},${r.lon});out geom tags;`;
-      return overpass(q,9000)};
-  // 브이월드와 OSM을 동시에 요청하고, 브이월드 건물이 오면 그것을 씁니다
-  const po=osm(true).catch(()=>null);
-  const vv=await vw.catch(()=>null);
-  let els=[];
-  if(vv&&vv.length){bld=vv;src.push('브이월드 도로명주소 건물');if(needRoad){const o=await po;if(o)els=o.elements.filter(e=>e.tags&&e.tags.highway)}}
-  else{const o=await po;if(!o)throw new Error('주변 건물 조회 지연');els=o.elements;src.push('OpenStreetMap')}
-  for(const e of els){const t=e.tags||{},c=e.center||(e.lat?{lat:e.lat,lon:e.lon}:null);
-    if(t.building&&c){if(NONRES.test(t.building)||t.amenity||t.shop||t.office)continue;bld.push({lat:c.lat,lon:c.lon,kind:RES.test(t.building)?'주택':'주택 추정'})}
-    else if(t.highway&&e.geometry)roads.push({t,geom:e.geometry})}
-  const res={bld,roads,src:src.join(' + ')||'–',Rb};NEAR_CACHE.set(ck,res);return res;
+  const dbg=r.debug=r.debug||{};
+  let bld=[],roads=[],src=[],total=0;
+  const pad=Rb/111000,box=`BOX(${r.lon-pad*1.25},${r.lat-pad},${r.lon+pad*1.25},${r.lat+pad})`;
+  const vw=CFG.vkey?vwData('LT_C_SPBD',box,1000).then(fs=>{dbg.vworld_buildings={count:fs.length,sample:fs.slice(0,3).map(f=>f.properties)};return fs},e=>{dbg.vworld_buildings={error:e.message};return null}):Promise.resolve(null);
+  let q=`[out:json][timeout:10];(way["building"](around:${Rb},${r.lat},${r.lon});node["building"](around:${Rb},${r.lat},${r.lon}););out center tags 3000;`;
+  if(needRoad)q+=`way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"](around:${Rr},${r.lat},${r.lon});out geom tags;`;
+  const po=overpass(q,9000).then(d=>{dbg.osm={count:(d.elements||[]).length};return d},e=>{dbg.osm={error:String(e&&e.message||e)};return null});
+  const fs=await vw;
+  if(fs&&fs.length){total+=fs.length;src.push('브이월드 도로명주소 건물');
+    for(const f of fs){const c=classifyVW(f.properties||{});if(!c)continue;const xy=turf.centroid(f).geometry.coordinates;bld.push({lat:xy[1],lon:xy[0],kind:c.kind,name:c.name})}}
+  // 브이월드가 있으면 OSM은 3초만 기다려 보완, 없으면 끝까지 기다림
+  const o=fs&&fs.length?await Promise.race([po,new Promise(res=>setTimeout(()=>res(null),3000))]):await po;
+  if(o){let added=0;
+    for(const e of o.elements||[]){const t=e.tags||{},c=e.center||(e.lat?{lat:e.lat,lon:e.lon}:null);
+      if(t.building&&c){total++;if(NONRES.test(t.building)||t.amenity||t.shop||t.office)continue;
+        if(bld.some(b=>Math.abs(b.lat-c.lat)<0.00015&&Math.abs(b.lon-c.lon)<0.00018))continue;
+        const apt=/^(apartments|dormitory|terrace)$/.test(t.building)||NAME_APT.test(t.name||'');
+        bld.push({lat:c.lat,lon:c.lon,kind:apt?'공동주택':RES.test(t.building)?'단독주택':'주택 추정',name:t.name||''});added++}
+      else if(t.highway&&e.geometry)roads.push({t,geom:e.geometry})}
+    if(added||!src.length)src.push('OpenStreetMap')}
+  if(!fs&&!o)throw new Error('주변 건물 자료를 불러오지 못했습니다');
+  const res={bld,roads,src:src.join(' + ')||'–',Rb,total};NEAR_CACHE.set(ck,res);return res;
 }
 function computeNear(r,raw){
   const tg=r.target;
   let houses=raw.bld.map(h=>({...h,d:tg.dist(h.lon,h.lat)})).filter(h=>h.d<=raw.Rb).sort((x,y)=>x.d-y.d).slice(0,1500);
-  for(const h of houses){let c=0;for(const o of houses){if(Math.abs(o.lat-h.lat)<0.0011&&Math.abs(o.lon-h.lon)<0.0014&&turf.distance([h.lon,h.lat],[o.lon,o.lat],{units:'meters'})<=100)c++}h.cluster=c>=5}
+  for(const h of houses){let c=0;for(const o of houses){if(Math.abs(o.lat-h.lat)<0.0011&&Math.abs(o.lon-h.lon)<0.0014&&turf.distance([h.lon,h.lat],[o.lon,o.lat],{units:'meters'})<=100)c+=(o.kind==='공동주택'?5:1)}h.cluster=c>=5}
   const roads=raw.roads.map(({t,geom})=>{const line=turf.lineString(geom.map(g=>[g.lon,g.lat]));let m=1e9;for(const v of tg.verts)m=Math.min(m,turf.pointToLineDistance(turf.point(v),line,{units:'meters'}));if(tg.f)for(const g of geom)m=Math.min(m,tg.dist(g.lon,g.lat));const cls=/^(motorway|trunk|primary)/.test(t.highway)?'고속·국도급':'지방도·군도급';return{name:t.name||(t.ref?t.ref+'번 도로':cls),cls,d:m}}).sort((x,y)=>x.d-y.d);
-  r.near={houses,roads,solars:[],src:raw.src,Rb:raw.Rb};
+  r.near={houses,roads,solars:[],src:raw.src,Rb:raw.Rb,total:raw.total};
 }
 
 let busy=false;
@@ -640,7 +656,8 @@ async function analyze(ll,drawn){
   busy=true;stepUI();$('#loading').classList.add('on');$('#hintbar').style.display='none';
   const timer=setInterval(()=>$('#elapsed').textContent=Math.round((Date.now()-r.t0)/1000),300);
   step('admin','done',`${sg.s} ${sg.n}`);
-  const run=async(id,fn)=>{step(id,'run');try{const t=await fn();step(id,'done',t);return true}catch(e){step(id,'fail',e&&e.message||'실패');return false}};
+  const sec=()=>((Date.now()-r.t0)/1000).toFixed(1)+'초';
+  const run=async(id,fn)=>{step(id,'run');try{const t=await fn();step(id,'done',`${t} · ${sec()}`);(r.time=r.time||{})[id]=sec();return true}catch(e){const m=e&&e.message||'실패';step(id,'fail',`${m} · ${sec()}`);(r.err=r.err||{})[id]=m;(r.time=r.time||{})[id]=sec();return false}};
   // 모든 조회를 동시에 시작
   const pParcel=(CFG.vkey||drawn)?run('parcel',()=>stepParcel(r,drawn)):(step('parcel','fail','키 없음: 위치 기준'),Promise.resolve());
   const pZone=CFG.vkey?run('zone',()=>stepZone(r)):(step('zone','fail','키 없음'),Promise.resolve());
@@ -649,15 +666,15 @@ async function analyze(ll,drawn){
   await pParcel;
   if(!r.parcel)r.parcel={geo:null,addr:'',jimok:null,area:CFG.area||3300,manual:true};
   r.target=makeTarget(lat,lon,r.parcel.geo);
-  const pTerrain=run('terrain',()=>stepTerrain(r));
-  try{computeNear(r,await pNear);step('near','done',`주택(추정) ${r.near.houses.length}채`)}catch(e){step('near','fail',e.message)}
+  r.terrainPending=true;const pTerrain=run('terrain',()=>stepTerrain(r)).finally(()=>r.terrainPending=false);
   await pZone;
-  // 핵심 결과 먼저 표시, 경사·일사량은 도착하는 대로 갱신
-  const show=()=>{judge(r);R=r;renderAll()};
-  if(!r.sun){const h=HOURS_FALLBACK[r.sido]||3.5;r.sun={ghi:null,monthly:null,hours:h,src:'시도별 추정 기본값'}}
-  show();drawResult(r);
+  // 필지·용도지역·조례가 오면 바로 결과를 보여주고, 주택·경사·일사량은 도착하는 대로 갱신
+  const show=()=>{if(!r.sun){const h=HOURS_FALLBACK[r.sido]||3.5;r.sun={ghi:null,monthly:null,hours:h,src:'시도별 추정 기본값'}}judge(r);R=r;renderAll()};
+  r.nearPending=true;show();drawResult(r);
   $('#loading').classList.remove('on');clearInterval(timer);busy=false;
   if(innerWidth<=820)$('#panel').classList.add('full');
+  pNear.then(raw=>{computeNear(r,raw);step('near','done',`주택(추정) ${r.near.houses.length}동 · ${sec()}`);(r.time=r.time||{}).near=sec()},e=>{step('near','fail',e.message);(r.err=r.err||{}).near=e.message;(r.time=r.time||{}).near=sec()})
+    .finally(()=>{r.nearPending=false;if(R===r){show();drawResult(r)}});
   Promise.all([pTerrain,pSun]).then(()=>{if(R===r)show()});
 }
 
@@ -685,10 +702,11 @@ function judge(r){
     let d=s<=10?'완만해서 토목 부담이 적습니다.':s<=15?'다소 경사가 있어 토목비가 늘 수 있습니다.':(jm==='임'?'산지 태양광 평균경사 기준(15°)을 넘을 가능성이 큽니다.':'경사가 커 토목·배수 검토가 필요합니다.');
     const a=r.terrain.aspect;if(!r.terrain.flat&&(a>=292.5||a<67.5))d+=' 북쪽으로 기울어 발전량이 줄어듭니다.';
     it.push({k:'경사·사면향',v:`${s.toFixed(1)}° ${r.terrain.flat?'평지':aspName(a)}`,lv,d:d+' (90m 격자 DEM 추정)'})}
-  else it.push({k:'경사·사면향',v:'미확인',lv:'unk',d:'고도 조회에 실패했습니다.'});
+  else it.push(r.terrainPending?{k:'경사·사면향',v:'확인 중…',lv:'unk',d:'고도 자료를 받고 있습니다.'}:{k:'경사·사면향',v:'미확인',lv:'unk',d:'고도 조회에 실패했습니다.'});
   // 이격
-  const a=r.applied,n=r.near;let sb={lv:'unk',v:'미확인',d:a.text};
-  if(n){
+  const a=r.applied,n=r.near;let sb=r.nearPending?{lv:'unk',v:'확인 중…',d:'주변 주택을 조회하고 있습니다. 몇 초 안에 자동으로 갱신됩니다.'}:{lv:'unk',v:'판정 못 함',d:'주변 건물 자료를 불러오지 못해 주택 거리를 확인하지 못했습니다. 위성사진으로 주변 주택을 직접 확인하세요. '+a.text};
+  if(n&&n.total===0&&a.mode!=='free'){sb={lv:'warn',v:'건물 자료 없음',d:`반경 ${nf(n.Rb)}m 안에 등록된 건물 자료가 하나도 없습니다. 신규 개발지라 자료가 늦게 반영됐을 수 있으니 위성사진으로 주택을 확인하세요. `+a.text}}
+  else if(n){
     const cl=n.houses.filter(h=>h.cluster),nc=cl.length?cl[0].d:null,na=n.houses.length?n.houses[0].d:null;
     r.setback={nearCluster:nc,nearAny:na,road:n.roads[0]||null};
     if(a.mode==='free') sb={lv:'ok',v:'규제 미적용',d:a.text};
@@ -723,12 +741,12 @@ function drawResult(r){
   if(a.house) ring(a.house,'#C8372D',`주거 이격 ${a.house}m`);
   if(a.mode==='old'&&a.road) ring(a.road,'#7a3cc0',`도로 이격 ${a.road}m`);
   if(r.near){
-    r.near.houses.slice(0,600).forEach(h=>L.circleMarker([h.lat,h.lon],{radius:h.cluster?5:3.5,color:h.cluster?'#C8372D':'#fff',weight:1.5,fillColor:h.cluster?'#ff8f85':'#C8372D',fillOpacity:.9}).bindTooltip(`${h.kind}${h.cluster?' · 주거밀집(5호+)':''} · ${nf(h.d)}m`).addTo(houseLayer));
+    r.near.houses.slice(0,600).forEach(h=>L.circleMarker([h.lat,h.lon],{radius:h.cluster?5:3.5,color:h.cluster?'#C8372D':'#fff',weight:1.5,fillColor:h.cluster?'#ff8f85':'#C8372D',fillOpacity:.9}).bindTooltip(`${esc(h.name||h.kind)}${h.name?' ('+h.kind+')':''}${h.cluster?' · 주거밀집(5호+)':''} · ${nf(h.d)}m`).addTo(houseLayer));
     r.near.solars.slice(0,100).forEach(s=>L.circleMarker([s.lat,s.lon],{radius:4,color:'#1a5fb4',weight:1,fillColor:'#62a0ea',fillOpacity:.9}).bindTooltip('기존 태양광'+(s.name?': '+esc(s.name):'')).addTo(judgeLayer));
   }
   if(!$('#lyJudge').checked)map.removeLayer(judgeLayer);if(!$('#lyHouses').checked)map.removeLayer(houseLayer);
   const b=r.parcel&&r.parcel.geo?L.geoJSON(r.parcel.geo).getBounds():L.latLng(c).toBounds(400);
-  map.fitBounds(b.pad(1.2),{maxZoom:17,paddingTopLeft:[0,0]});
+  if(!r._fitted){r._fitted=true;map.fitBounds(b.pad(1.2),{maxZoom:17,paddingTopLeft:[0,0]})}
 }
 
 /* ===== 계산 ===== */
@@ -775,12 +793,13 @@ function render2(){
      ${o.url?`<p style="margin:8px 0 0"><a href="${esc(o.url)}" target="_blank" rel="noopener">조례 원문 보기 (자치법규정보시스템)</a></p>`:''}</div>`}
   h+=`<p class="hint">자료: ${esc(ordSrcText(o)||'조례 정보 미수록')}${o?'':' · <a href="https://www.elis.go.kr/" target="_blank" rel="noopener">자치법규정보시스템</a>에서 원문을 확인하세요.'}</p>`;
   if(n){const cl=n.houses.filter(x=>x.cluster).length;
-    h+=`<h4 class="sec">주변 주택·도로 (반경 ${nf(n.Rb)}m)</h4><dl class="kv"><dt>주택(추정) 수</dt><dd>${nf(n.houses.length)}채</dd><dt>주거밀집(100m 안 5호+)에 속한 주택</dt><dd>${nf(cl)}채</dd>
+    h+=`<h4 class="sec">주변 주택·도로 (반경 ${nf(n.Rb)}m)</h4><dl class="kv"><dt>조회된 건물 / 주택(추정)</dt><dd>${nf(n.total)}동 / ${nf(n.houses.length)}동</dd><dt>그중 공동주택(빌라 등)</dt><dd>${nf(n.houses.filter(x=>x.kind==='공동주택').length)}동</dd><dt>주거밀집(100m 안 5호+)에 속한 주택</dt><dd>${nf(cl)}채</dd>
      <dt>가장 가까운 주택</dt><dd>${r.setback&&r.setback.nearAny!=null?nf(r.setback.nearAny)+'m':'–'}</dd><dt>가장 가까운 주거밀집</dt><dd>${r.setback&&r.setback.nearCluster!=null?nf(r.setback.nearCluster)+'m':'–'}</dd>
      <dt>가장 가까운 주요도로</dt><dd>${n.roads[0]?esc(n.roads[0].name)+' · '+nf(n.roads[0].d)+'m':'–'}</dd></dl>
      <p class="hint">자료: ${esc(n.src)}. 지도에 빨간 점은 주택, 테두리 진한 점은 주거밀집에 속한 주택입니다. 미등재·신축 주택은 빠질 수 있으니 현장 확인이 필요합니다.</p>`}
   h+=`<h4 class="sec">토지·용도</h4><dl class="kv"><dt>지목</dt><dd>${esc(r.parcel.jimok||'–')}</dd><dt>용도지역</dt><dd>${z?esc(z.names.join(', ')||'미확인'):'–'}</dd><dt>농업진흥구역</dt><dd>${z?(z.jinheung?'해당':'아님'):'–'}</dd><dt>농업보호구역</dt><dd>${z?(z.boho?'해당':'아님'):'–'}</dd><dt>개발제한구역</dt><dd>${z?(z.gb?'해당':'아님'):'–'}</dd><dt>공시지가</dt><dd>${r.parcel.jiga?nf(r.parcel.jiga)+'원/㎡':'–'}</dd></dl>`;
   if(t)h+=`<h4 class="sec">지형</h4><dl class="kv"><dt>평균 경사</dt><dd>${t.slope.toFixed(1)}°</dd><dt>사면향</dt><dd>${t.flat?'평지':aspName(t.aspect)+` (${Math.round(t.aspect)}°)`}</dd><dt>표고</dt><dd>${nf(t.min)}~${nf(t.max)}m</dd></dl>`;
+  if(DEBUG)h+=`<h4 class="sec">진단 정보 (debug)</h4><pre style="white-space:pre-wrap;font-size:11px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:320px;overflow:auto">${esc(JSON.stringify({vkey:CFG.vkey?'있음':'없음',domain:CFG.vdomain,time:r.time||null,err:r.err||null,debug:r.debug||null,parcel:r.parcel&&{addr:r.parcel.addr,jimok:r.parcel.jimok,area:r.parcel.area},zone:r.zone,near:r.near&&{total:r.near.total,houses:r.near.houses.length,src:r.near.src}},null,1))}</pre>`;
   $('#t2').innerHTML=h;
 }
 function render3(){
@@ -919,7 +938,7 @@ function staticDialogs(){
   <tr><td>용도지역</td><td>계획·생산관리, 농림, 자연녹지, 공업 → 가능 / 보전관리, 생산녹지, 주거·상업, 농업보호구역 → 협의 / 자연환경보전, 보전녹지, 농업진흥구역, 개발제한구역 → 어려움</td></tr>
   <tr><td>지목</td><td>대·잡종지·공장용지 → 유리 / 전·답·과 → 농지전용 협의 / 임야 → 산지전용·REC 0.5 / 도로·하천 등 공공용지 → 어려움</td></tr>
   <tr><td>경사</td><td>필지 범위 5×5 고도 격자로 평면을 맞춰 평균 경사를 구합니다. 10° 이하 가능, 15° 이하 협의, 임야에서 15° 초과는 어려움</td></tr>
-  <tr><td>조례 이격거리</td><td>필지 경계에서 주택까지 거리를 잽니다. 반경 100m 안에 주택이 5채 이상이면 '주거밀집'으로 봅니다. 2026.9.18 시행 국가 상한(주거 최대 200m, 도로 이격 금지)을 적용하되, 기존 조례를 계속 적용한다고 답한 지자체는 조례값으로 판정합니다.</td></tr>
+  <tr><td>조례 이격거리</td><td>필지 경계에서 주택까지 거리를 잽니다. 반경 100m 안에 주택이 5호 이상이면 '주거밀집'으로 봅니다. 빌라·아파트 등 공동주택은 한 동을 5호로 봅니다(세대 수 산정은 고시 기준이므로 허가부서 확인). 2026.9.18 시행 국가 상한(주거 최대 200m, 도로 이격 금지)을 적용하되, 기존 조례를 계속 적용한다고 답한 지자체는 조례값으로 판정합니다.</td></tr>
 </table>
   <p class="hint">계통(한전 변전소·선로 여유용량)은 이 화면에서 판정하지 않습니다. 한전ON에서 따로 확인하세요.<br>조례 데이터 우선순위: 설정에서 불러온 엑셀 → 조례 모니터링 엑셀(data/ordinances.json) → 내장 자료(출처 명시) → 법정 상한 가정.</p>`;
   $('#safetyBody').innerHTML=`<p>태양광 발전설비를 안전하게 운영하기 위해 현장에서 자주 확인하는 항목입니다.</p><dl>
