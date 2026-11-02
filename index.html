@@ -416,7 +416,7 @@ const GLOSSARY = [
 /* ===== 공통 ===== */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const DEF={vkey:'8ECCB2A4-F393-378E-90A5-8888E133E7F0',vdomain:'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0,roofUse:70,roofPyeongPerKw:2.5,costRoof:1150000,kepcoProxy:''};
+const DEF={vkey:'8ECCB2A4-F393-378E-90A5-8888E133E7F0',vdomain:'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0,roofUse:70,roofPyeongPerKw:2.5,costRoof:1150000,kepcoProxy:'https://semyung-kepco.kmh09412.workers.dev'};
 let KEPCO_KEY=localStorage.getItem('sms.kepcoKey')||'';
 let SUBST_AREA={};
 let BASE={...DEF};
@@ -532,7 +532,7 @@ $$('.examples button').forEach(b=>b.onclick=()=>{const [a,c]=b.dataset.ll.split(
 
 /* ===== 분석 ===== */
 let R=null, judgeLayer=L.layerGroup().addTo(map), houseLayer=L.layerGroup().addTo(map);
-const STEPS=[['admin','행정구역·조례 이격거리'],['parcel','필지 경계·지목 (브이월드)'],['zone','용도지역·농업진흥·개발제한 (브이월드)'],['terrain','경사·사면향 (DEM 고도)'],['sun','일사량 (NASA POWER 위성 기후값)'],['near','주변 주택·도로·기존 발전소 (OSM / 브이월드)'],['grid','한전 계통 여유용량 (분산전원연계)']];
+const STEPS=[['admin','행정구역·조례 이격거리'],['parcel','필지 경계·지목'],['zone','용도지역·농업진흥·개발제한'],['terrain','경사·사면향 (DEM 고도)'],['sun','일사량 (NASA POWER 위성 기후값)'],['near','주변 주택·도로'],['grid','한전 계통 여유용량 (분산전원연계)']];
 function stepUI(){$('#steps').innerHTML=STEPS.map(s=>`<li id="st-${s[0]}">${s[1]}</li>`).join('')}
 function step(id,cls,txt){const li=$('#st-'+id);if(!li)return;li.className=cls;if(txt)li.innerHTML=STEPS.find(s=>s[0]===id)[1]+` <small>${esc(txt)}</small>`}
 
@@ -1051,7 +1051,7 @@ function staticDialogs(){
 
 /* ===== 설정·데이터 불러오기 ===== */
 $('#btnSettings').onclick=()=>{$('#cfgKey').value=CFG.vkey;$('#cfgDomain').value=CFG.vdomain;$('#cfgProxy').value=CFG.kepcoProxy||'';$('#cfgKepco').value=KEPCO_KEY;ordStatusText();$('#dlgSettings').showModal()};
-$('#btnSaveCfg').onclick=()=>{CFG.kepcoProxy=$('#cfgProxy').value.trim();KEPCO_KEY=$('#cfgKepco').value.trim();try{KEPCO_KEY?localStorage.setItem('sms.kepcoKey',KEPCO_KEY):localStorage.removeItem('sms.kepcoKey')}catch(e){};const kc=CFG.vkey!==$('#cfgKey').value.trim();CFG.vkey=$('#cfgKey').value.trim();CFG.vdomain=$('#cfgDomain').value.trim()||DEF.vdomain;saveCfg();$('#dlgSettings').close();if(kc){setBase(baseName);keyNotice();toast(CFG.vkey?'브이월드 키를 저장했습니다. 필지를 다시 눌러 정밀 분석하세요.':'키를 지웠습니다.')}};
+$('#btnSaveCfg').onclick=()=>{CFG.kepcoProxy=$('#cfgProxy').value.trim()||BASE.kepcoProxy;KEPCO_KEY=$('#cfgKepco').value.trim();try{KEPCO_KEY?localStorage.setItem('sms.kepcoKey',KEPCO_KEY):localStorage.removeItem('sms.kepcoKey')}catch(e){};const kc=CFG.vkey!==$('#cfgKey').value.trim();CFG.vkey=$('#cfgKey').value.trim();CFG.vdomain=$('#cfgDomain').value.trim()||DEF.vdomain;saveCfg();$('#dlgSettings').close();if(kc){setBase(baseName);keyNotice();toast(CFG.vkey?'브이월드 키를 저장했습니다. 필지를 다시 눌러 정밀 분석하세요.':'키를 지웠습니다.')}};
 const POL={'기존조례적용':'old','기존':'old','old':'old','미적용':'none','none':'none','상한적용':'cap','상위법':'cap','cap':'cap','개정완료':'amended','개정':'amended','amended':'amended'};
 function normSido(s){s=String(s||'').trim();const m={'충남':'충청남도','충북':'충청북도','전남':'전라남도','전북':'전북특별자치도','전라북도':'전북특별자치도','경남':'경상남도','경북':'경상북도','경기':'경기도','강원':'강원특별자치도','강원도':'강원특별자치도','제주':'제주특별자치도','제주도':'제주특별자치도','세종':'세종특별자치시','인천':'인천광역시','대구':'대구광역시','부산':'부산광역시','광주':'광주광역시','대전':'대전광역시','울산':'울산광역시','서울':'서울특별시'};return m[s]||s}
 function guessSido(sgg){const f=SGG.features.filter(x=>x.properties.n===sgg);return f.length===1?f[0].properties.s:''}
@@ -1082,7 +1082,7 @@ async function loadAuto(){
   const [o,p,sa]=await Promise.all([getData('data/ordinances.json'),getData('data/prices.json'),getData('data/substations_area.json')]);
   if(sa&&sa.items)SUBST_AREA=sa.items;
   if(o){ORD_AUTO=o.items||{};ORD_META=o;buildSgg();staticDialogs();if(R){R.ord=ordFor(R.sido,R.sgg);R.applied=applied(R.ord);judge(R);renderAll()}}
-  if(p){const user=LS.get('sms.cfg',{});BASE={...DEF,...p};CFG={...BASE,...user};}
+  if(p){const user=LS.get('sms.cfg',{});if(!p.kepcoProxy)delete p.kepcoProxy;if(!user.kepcoProxy)delete user.kepcoProxy;BASE={...DEF,...p};CFG={...BASE,...user};}
 }
 
 /* ===== 시작 ===== */
