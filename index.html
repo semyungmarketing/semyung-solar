@@ -314,6 +314,10 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
     <p class="hint">필지 경계, 지목, 용도지역, 농업진흥지역, 연속지적도, 정확한 주소검색, 건물 용도(주택 판별)에 씁니다. 키는 이 브라우저에만 저장됩니다. 키에 등록한 도메인(예: semyungmarketing.github.io)에서 열어야 작동합니다.</p>
     <div class="field"><label for="cfgKey">인증키</label><input id="cfgKey" type="password" style="text-align:left" placeholder="브이월드 인증키"></div>
     <div class="field"><label for="cfgDomain">등록 도메인</label><input id="cfgDomain" style="text-align:left"></div>
+    <h4 class="sec">한전 계통 여유용량</h4>
+    <p class="hint">필지를 누르면 한전 분산전원연계 정보로 변전소·변압기·선로 여유용량을 조회합니다. 공개 사이트에는 <b>프록시 주소</b>를 쓰세요(키가 노출되지 않음). 인증키 칸은 이 브라우저에만 저장되는 내부 테스트용입니다.</p>
+    <div class="field"><label for="cfgProxy">프록시 주소</label><input id="cfgProxy" style="text-align:left" placeholder="https://xxx.workers.dev"></div>
+    <div class="field"><label for="cfgKepco">한전 인증키(내부용)</label><input id="cfgKepco" type="password" style="text-align:left" placeholder="40자리"></div>
     <h4 class="sec">조례 이격거리 데이터</h4>
     <p class="hint">평소에는 저장소의 조례 모니터링 엑셀(raw 폴더)이 자동 적용됩니다. 여기서 엑셀을 불러오면 이 브라우저에서만 그 값이 우선합니다. 열 이름: <b>시도, 시군, 주거(m), 도로(m), 처리방침, 비고, 기준일</b>. 처리방침은 <i>기존조례적용 / 미적용 / 상한적용 / 개정완료</i> 중 하나로 적습니다.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -412,7 +416,9 @@ const GLOSSARY = [
 /* ===== 공통 ===== */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const DEF={vkey:'8ECCB2A4-F393-378E-90A5-8888E133E7F0',vdomain:'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0,roofUse:70,roofPyeongPerKw:2.5,costRoof:1150000};
+const DEF={vkey:'8ECCB2A4-F393-378E-90A5-8888E133E7F0',vdomain:'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0,roofUse:70,roofPyeongPerKw:2.5,costRoof:1150000,kepcoProxy:''};
+let KEPCO_KEY=localStorage.getItem('sms.kepcoKey')||'';
+let SUBST_AREA={};
 let BASE={...DEF};
 let CFG=Object.assign({},BASE,LS.get('sms.cfg',{}));
 let ORD_USER=LS.get('sms.ord',{}), ORD_AUTO={}, ORD_META={};
@@ -526,7 +532,7 @@ $$('.examples button').forEach(b=>b.onclick=()=>{const [a,c]=b.dataset.ll.split(
 
 /* ===== 분석 ===== */
 let R=null, judgeLayer=L.layerGroup().addTo(map), houseLayer=L.layerGroup().addTo(map);
-const STEPS=[['admin','행정구역·조례 이격거리'],['parcel','필지 경계·지목 (브이월드)'],['zone','용도지역·농업진흥·개발제한 (브이월드)'],['terrain','경사·사면향 (DEM 고도)'],['sun','일사량 (NASA POWER 위성 기후값)'],['near','주변 주택·도로·기존 발전소 (OSM / 브이월드)']];
+const STEPS=[['admin','행정구역·조례 이격거리'],['parcel','필지 경계·지목 (브이월드)'],['zone','용도지역·농업진흥·개발제한 (브이월드)'],['terrain','경사·사면향 (DEM 고도)'],['sun','일사량 (NASA POWER 위성 기후값)'],['near','주변 주택·도로·기존 발전소 (OSM / 브이월드)'],['grid','한전 계통 여유용량 (분산전원연계)']];
 function stepUI(){$('#steps').innerHTML=STEPS.map(s=>`<li id="st-${s[0]}">${s[1]}</li>`).join('')}
 function step(id,cls,txt){const li=$('#st-'+id);if(!li)return;li.className=cls;if(txt)li.innerHTML=STEPS.find(s=>s[0]===id)[1]+` <small>${esc(txt)}</small>`}
 
@@ -654,6 +660,40 @@ function computeNear(r,raw){
   autoMode(r);
 }
 
+/* ===== 한전 계통 ===== */
+function parseAddr(addr){
+  const t=String(addr||'').trim().split(/\s+/);const o={sido:t[0]||'',sgg:'',emd:'',li:'',jibun:''};let i=1;
+  const sg=[];while(i<t.length&&/(시|군|구)$/.test(t[i])&&!/(읍|면|동|가|리)$/.test(t[i])){sg.push(t[i]);i++}
+  o.sgg=sg.join('');if(i<t.length&&/(읍|면|동|가|로)$/.test(t[i])){o.emd=t[i];i++}
+  if(i<t.length&&/리$/.test(t[i])){o.li=t[i];i++}
+  o.jibun=t.slice(i).join(' ');return o;
+}
+const numv=v=>{if(v==null||v==='')return null;const n=parseFloat(String(v).replace(/,/g,''));return isNaN(n)?null:n};
+const GRID_CACHE=new Map();
+async function stepGrid(r){
+  const p=r.parcel;if(!p||!p.pnu)throw new Error('필지 정보 없음');
+  const a=parseAddr(p.addr);const jb=(p.jibunNo||a.jibun||'').replace(/\s+/g,'');
+  const q=new URLSearchParams({metroCd:String(p.pnu).slice(0,2),cityCd:String(p.pnu).slice(2,5)});
+  if(a.emd)q.set('addrLidong',a.emd);if(a.li)q.set('addrLi',a.li);if(jb)q.set('addrJibun',jb);
+  const ck=q.toString();let d=GRID_CACHE.get(ck);
+  if(!d){
+    let url;if(CFG.kepcoProxy){url=CFG.kepcoProxy.replace(/\/$/,'')+'?'+ck}else if(KEPCO_KEY){url='https://bigdata.kepco.co.kr/openapi/v1/dispersedGeneration.do?'+ck+'&returnType=json&apiKey='+encodeURIComponent(KEPCO_KEY)}else throw new Error('한전 연결 미설정');
+    try{d=await fetchJSON(url,{},10000)}catch(e){throw new Error(CFG.kepcoProxy?'한전 조회 실패('+e.message+')':'브라우저에서 한전 직접 조회가 막혔습니다. 프록시 주소를 설정하세요')}
+    GRID_CACHE.set(ck,d);
+  }
+  const list=Array.isArray(d)?d:(d.data||d.list||[]);
+  const items=list.map(x=>({sub:x.substNm,subCd:x.substCd,mtr:x.mtrNo,dl:x.dlNm,dlCd:x.dlCd,subCum:numv(x.substPwr),mtrCum:numv(x.mtrPwr),dlCum:numv(x.dlPwr),v1:numv(x.vol1),v2:numv(x.vol2),v3:numv(x.vol3)}));
+  items.forEach(x=>{const v=[x.v1,x.v2,x.v3].filter(y=>y!=null);x.avail=v.length?Math.min(...v):null});
+  r.grid={items,query:Object.fromEntries(q),raw:DEBUG?d:undefined};
+  if(!items.length)return '해당 주소 선로 정보 없음';
+  const best=Math.max(...items.map(x=>x.avail??-1e9));
+  return best>-1e9?`여유 ${nf(best)}kW`:`선로 ${items.length}건`;
+}
+function substArea(r){
+  const a=parseAddr(r.parcel&&r.parcel.addr);if(!a.emd)return null;
+  return SUBST_AREA[`${a.sido}|${a.sgg}|${a.emd}`]||null;
+}
+
 let busy=false;
 const RESULT_CACHE=new Map();
 async function analyze(ll,drawn){
@@ -678,6 +718,8 @@ async function analyze(ll,drawn){
   if(!r.parcel)r.parcel={geo:null,addr:'',jimok:null,area:CFG.area||3300,manual:true};
   r.target=makeTarget(lat,lon,r.parcel.geo);
   r.terrainPending=true;const pTerrain=run('terrain',()=>stepTerrain(r)).finally(()=>r.terrainPending=false);
+  let pGrid=Promise.resolve();
+  if(r.parcel.pnu&&(CFG.kepcoProxy||KEPCO_KEY)){r.gridPending=true;pGrid=run('grid',()=>stepGrid(r)).finally(()=>r.gridPending=false)}else step('grid','fail',CFG.kepcoProxy||KEPCO_KEY?'필지 정보 없음':'한전 연결 미설정');
   await pZone;
   // 필지·용도지역·조례가 오면 바로 결과를 보여주고, 주택·경사·일사량은 도착하는 대로 갱신
   const show=()=>{if(!r.sun){const h=HOURS_FALLBACK[r.sido]||3.5;r.sun={ghi:null,monthly:null,hours:h,src:'시도별 추정 기본값'}}judge(r);R=r;renderAll()};
@@ -686,7 +728,8 @@ async function analyze(ll,drawn){
   if(innerWidth<=820)$('#panel').classList.add('full');
   pNear.then(raw=>{computeNear(r,raw);step('near','done',`주택(추정) ${r.near.houses.length}동 · ${sec()}`);(r.time=r.time||{}).near=sec()},e=>{step('near','fail',e.message);(r.err=r.err||{}).near=e.message;(r.time=r.time||{}).near=sec()})
     .finally(()=>{r.nearPending=false;if(R===r){show();drawResult(r)}});
-  Promise.all([pTerrain,pSun]).then(()=>{if(R===r)show()});
+  Promise.all([pTerrain,pSun,pGrid]).then(()=>{if(R===r)show()});
+  pGrid.then(()=>{if(R===r)show()});
 }
 
 /* ===== 판정 ===== */
@@ -739,6 +782,17 @@ function judge(r){
   }
   if(roof)sb={lv:'ok',v:'해당 없음',d:'건물 지붕형 태양광은 주택·도로 이격거리 적용 대상이 아닙니다(재생에너지법 시행령). 다만 축사 등 일부 건물은 조례에 사용승인 후 경과기간 같은 조건이 있으니 입지분석 탭의 조례 원문을 확인하세요.'};
   it.push({k:'조례 이격거리',v:sb.v,lv:sb.lv,d:sb.d});
+  // 계통
+  {const sa=substArea(r);const saTxt=sa?` 이 읍면동의 공급 변전소(한전 2024.5 자료): ${sa.join(', ')}.`:'';
+   const kw=finance(r).kw;let g;
+   if(r.gridPending)g={k:'계통(한전 여유용량)',v:'확인 중…',lv:'unk',d:'한전 분산전원연계 정보를 조회하고 있습니다.'};
+   else if(r.grid&&r.grid.items.length){const av=r.grid.items.filter(x=>x.avail!=null).sort((a,b)=>b.avail-a.avail);
+     if(!av.length)g={k:'계통(한전 여유용량)',v:'여유 미표기',lv:'warn',d:`${r.grid.items[0].sub||''} 변전소 ${r.grid.items[0].dl||''} 선로가 조회됐지만 여유용량 값이 비어 있습니다. 한전ON에서 확인하세요.`};
+     else{const b=av[0];const lv=b.avail<=0?'bad':b.avail<kw?'warn':'ok';
+       g={k:'계통(한전 여유용량)',v:`${nf(b.avail)}kW`,lv,d:`${b.sub||''} 변전소 ${b.mtr?b.mtr+'번 변압기 ':''}${b.dl||''} 선로 기준. 변전소·변압기·선로 여유 중 가장 작은 값입니다. `+(lv==='ok'?`예상 용량 ${nf(kw)}kW를 접속할 여유가 있습니다.`:lv==='warn'?`예상 용량 ${nf(kw)}kW보다 여유가 작아 용량 조정이나 계통 보강 협의가 필요합니다.`:'여유가 없어 계통 보강 전에는 접속이 어렵습니다.')+' 한전 표기 기준이며 접수 순서에 따라 바뀝니다.'}}}
+   else if(r.grid)g={k:'계통(한전 여유용량)',v:'정보 없음',lv:'unk',d:'이 주소로 조회된 선로 정보가 없습니다. 한전ON에서 확인하세요.'+saTxt};
+   else g={k:'계통(한전 여유용량)',v:sa?sa.join(', '):'미확인',lv:'unk',d:(r.err&&r.err.grid?r.err.grid+'. ':CFG.kepcoProxy||KEPCO_KEY?'':'⚙ 설정에서 한전 연결(프록시 주소)을 넣으면 여유용량을 조회합니다. ')+saTxt};
+   it.push(g);}
   const order={bad:3,warn:2,ok:1,unk:0};const worst=it.reduce((m,x)=>order[x.lv]>order[m]?x.lv:m,'unk');
   const known=it.filter(x=>x.lv!=='unk').length;
   r.judge={items:it,overall:known<2?'unk':worst};
@@ -814,6 +868,12 @@ function render2(){
      <dt>가장 가까운 주택</dt><dd>${r.setback&&r.setback.nearAny!=null?nf(r.setback.nearAny)+'m':'–'}</dd><dt>가장 가까운 주거밀집</dt><dd>${r.setback&&r.setback.nearCluster!=null?nf(r.setback.nearCluster)+'m':'–'}</dd>
      <dt>가장 가까운 주요도로</dt><dd>${n.roads[0]?esc(n.roads[0].name)+' · '+nf(n.roads[0].d)+'m':'–'}</dd></dl>
      <p class="hint">자료: ${esc(n.src)}. 지도에 빨간 점은 주택, 테두리 진한 점은 주거밀집에 속한 주택입니다. 미등재·신축 주택은 빠질 수 있으니 현장 확인이 필요합니다.</p>`}
+  {const g=r.grid,sa=substArea(r);
+   h+=`<h4 class="sec">계통 · 한전 분산전원연계 정보</h4>`;
+   if(g&&g.items.length)h+=`<div class="tblwrap"><table style="width:100%;font-size:12.5px;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:8px"><thead><tr><th>변전소</th><th>변압기</th><th>선로(DL)</th><th>변전소 여유</th><th>변압기 여유</th><th>선로 여유</th></tr></thead><tbody>${g.items.map(x=>`<tr><td>${esc(x.sub||'')}</td><td>${esc(x.mtr||'')}</td><td>${esc(x.dl||'')}</td><td class="num">${x.v1!=null?nf(x.v1):'–'}</td><td class="num">${x.v2!=null?nf(x.v2):'–'}</td><td class="num">${x.v3!=null?nf(x.v3):'–'}</td></tr>`).join('')}</tbody></table></div>
+     <p class="hint">단위 kW(한전 표기). 누적 연계용량: ${g.items.slice(0,3).map(x=>`${esc(x.sub||'')} ${nf(x.subCum)} / ${esc(x.dl||'')} ${nf(x.dlCum)}`).join(', ')}. 조회 주소: ${esc(Object.values(g.query).join(' '))}</p>`;
+   else h+=`<p class="hint">${r.gridPending?'조회 중입니다.':r.grid?'이 주소로 조회된 선로 정보가 없습니다.':esc((r.err&&r.err.grid)||'한전 연결이 설정되지 않았습니다.')}${sa?` 공급 변전소(2024.5 자료): <b>${esc(sa.join(', '))}</b>`:''}</p>`;
+   h+=`<p class="hint"><a href="https://online.kepco.co.kr/" target="_blank" rel="noopener">한전ON</a>에서 최신 접속 가능 여부를 확인하세요.</p>`}
   h+=`<h4 class="sec">토지·용도</h4><dl class="kv"><dt>지목</dt><dd>${esc(r.parcel.jimok||'–')}</dd><dt>용도지역</dt><dd>${z?esc(z.names.join(', ')||'미확인'):'–'}</dd><dt>농업진흥구역</dt><dd>${z?(z.jinheung?'해당':'아님'):'–'}</dd><dt>농업보호구역</dt><dd>${z?(z.boho?'해당':'아님'):'–'}</dd><dt>개발제한구역</dt><dd>${z?(z.gb?'해당':'아님'):'–'}</dd><dt>공시지가</dt><dd>${r.parcel.jiga?nf(r.parcel.jiga)+'원/㎡':'–'}</dd></dl>`;
   if(t)h+=`<h4 class="sec">지형</h4><dl class="kv"><dt>평균 경사</dt><dd>${t.slope.toFixed(1)}°</dd><dt>사면향</dt><dd>${t.flat?'평지':aspName(t.aspect)+` (${Math.round(t.aspect)}°)`}</dd><dt>표고</dt><dd>${nf(t.min)}~${nf(t.max)}m</dd></dl>`;
   if(DEBUG)h+=`<h4 class="sec">진단 정보 (debug)</h4><pre style="white-space:pre-wrap;font-size:11px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:320px;overflow:auto">${esc(JSON.stringify({vkey:CFG.vkey?'있음':'없음',domain:CFG.vdomain,time:r.time||null,err:r.err||null,debug:r.debug||null,parcel:r.parcel&&{addr:r.parcel.addr,jimok:r.parcel.jimok,area:r.parcel.area},zone:r.zone,near:r.near&&{total:r.near.total,houses:r.near.houses.length,src:r.near.src}},null,1))}</pre>`;
@@ -961,8 +1021,8 @@ function staticDialogs(){
   <tr><td>지목</td><td>대·잡종지·공장용지 → 유리 / 전·답·과 → 농지전용 협의 / 임야 → 산지전용·REC 0.5 / 도로·하천 등 공공용지 → 어려움</td></tr>
   <tr><td>경사</td><td>필지 범위 5×5 고도 격자로 평면을 맞춰 평균 경사를 구합니다. 10° 이하 가능, 15° 이하 협의, 임야에서 15° 초과는 어려움</td></tr>
   <tr><td>조례 이격거리</td><td>필지 경계에서 주택까지 거리를 잽니다. 반경 100m 안에 주택이 5호 이상이면 '주거밀집'으로 봅니다. 빌라·아파트 등 공동주택은 한 동을 5호로 봅니다(세대 수 산정은 고시 기준이므로 허가부서 확인). 2026.9.18 시행 국가 상한(주거 최대 200m, 도로 이격 금지)을 적용하되, 기존 조례를 계속 적용한다고 답한 지자체는 조례값으로 판정합니다.</td></tr>
-</table>
-  <p class="hint">계통(한전 변전소·선로 여유용량)은 이 화면에서 판정하지 않습니다. 한전ON에서 따로 확인하세요.<br>조례 데이터 우선순위: 설정에서 불러온 엑셀 → 조례 모니터링 엑셀(data/ordinances.json) → 내장 자료(출처 명시) → 법정 상한 가정.</p>`;
+  <tr><td>계통</td><td>한전 분산전원연계 정보에서 필지 주소의 변전소·변압기·선로(DL) 여유용량을 받아, 셋 중 가장 작은 값이 예상 설치 용량 이상이면 가능, 작으면 협의, 0 이하면 어려움</td></tr></table>
+  <p class="hint">조례 데이터 우선순위: 설정에서 불러온 엑셀 → 조례 모니터링 엑셀(data/ordinances.json) → 내장 자료(출처 명시) → 법정 상한 가정.</p>`;
   $('#safetyBody').innerHTML=`<p>태양광 발전설비를 안전하게 운영하기 위해 현장에서 자주 확인하는 항목입니다.</p><dl>
   <dt>접속반·인버터 발열</dt><dd>여름철 고온에서 단자 풀림·과열이 늘어납니다. 열화상 점검으로 단자 온도를 확인하세요.</dd>
   <dt>모듈 핫스팟·파손</dt><dd>그늘, 오염, 셀 균열은 국부 과열을 만듭니다. 드론 열화상 촬영으로 넓은 부지를 빠르게 점검할 수 있습니다.</dd>
@@ -980,14 +1040,15 @@ function staticDialogs(){
   <tr><td>일사량</td><td>NASA POWER 기후값(ALLSKY_SFC_SW_DWN, 장기 평균)</td></tr>
   <tr><td>주택·도로·기존 태양광</td><td>© OpenStreetMap 기여자(ODbL, Overpass API 실시간 조회) / 브이월드 도로명주소 건물(키 있을 때). 크라우드소싱 자료라 누락이 있을 수 있습니다</td></tr>
   <tr><td>조례 이격거리</td><td>조례 모니터링 엑셀(자치법규정보시스템 원문 정리, ${esc(ORD_META.updated||'')} 갱신, ${nf(ORD_META.count||0)}개 시·군)<br>보조: ${Object.values(ORD_SRC).map(esc).join(' / ')}</td></tr>
+  <tr><td>계통 여유용량</td><td>한국전력공사 전력데이터 개방포털 분산전원연계 정보 API(실시간) / 보조: 한전 지역별 공급가능 변전소 정보(2024.5.13)</td></tr>
   <tr><td>법정 상한</td><td>${esc(LEGAL.basis)}, ${LEGAL.since} 시행</td></tr>
   <tr><td>SMP·REC 기본값</td><td>전력거래소 계통한계가격·신재생원스톱 현물시장(2026년 10월 3주차 육지 평균)</td></tr></table>
   <p class="hint">모든 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 인허가는 관계기관 확인이 필요합니다.</p>`;
 }
 
 /* ===== 설정·데이터 불러오기 ===== */
-$('#btnSettings').onclick=()=>{$('#cfgKey').value=CFG.vkey;$('#cfgDomain').value=CFG.vdomain;ordStatusText();$('#dlgSettings').showModal()};
-$('#btnSaveCfg').onclick=()=>{const kc=CFG.vkey!==$('#cfgKey').value.trim();CFG.vkey=$('#cfgKey').value.trim();CFG.vdomain=$('#cfgDomain').value.trim()||DEF.vdomain;saveCfg();$('#dlgSettings').close();if(kc){setBase(baseName);keyNotice();toast(CFG.vkey?'브이월드 키를 저장했습니다. 필지를 다시 눌러 정밀 분석하세요.':'키를 지웠습니다.')}};
+$('#btnSettings').onclick=()=>{$('#cfgKey').value=CFG.vkey;$('#cfgDomain').value=CFG.vdomain;$('#cfgProxy').value=CFG.kepcoProxy||'';$('#cfgKepco').value=KEPCO_KEY;ordStatusText();$('#dlgSettings').showModal()};
+$('#btnSaveCfg').onclick=()=>{CFG.kepcoProxy=$('#cfgProxy').value.trim();KEPCO_KEY=$('#cfgKepco').value.trim();try{KEPCO_KEY?localStorage.setItem('sms.kepcoKey',KEPCO_KEY):localStorage.removeItem('sms.kepcoKey')}catch(e){};const kc=CFG.vkey!==$('#cfgKey').value.trim();CFG.vkey=$('#cfgKey').value.trim();CFG.vdomain=$('#cfgDomain').value.trim()||DEF.vdomain;saveCfg();$('#dlgSettings').close();if(kc){setBase(baseName);keyNotice();toast(CFG.vkey?'브이월드 키를 저장했습니다. 필지를 다시 눌러 정밀 분석하세요.':'키를 지웠습니다.')}};
 const POL={'기존조례적용':'old','기존':'old','old':'old','미적용':'none','none':'none','상한적용':'cap','상위법':'cap','cap':'cap','개정완료':'amended','개정':'amended','amended':'amended'};
 function normSido(s){s=String(s||'').trim();const m={'충남':'충청남도','충북':'충청북도','전남':'전라남도','전북':'전북특별자치도','전라북도':'전북특별자치도','경남':'경상남도','경북':'경상북도','경기':'경기도','강원':'강원특별자치도','강원도':'강원특별자치도','제주':'제주특별자치도','제주도':'제주특별자치도','세종':'세종특별자치시','인천':'인천광역시','대구':'대구광역시','부산':'부산광역시','광주':'광주광역시','대전':'대전광역시','울산':'울산광역시','서울':'서울특별시'};return m[s]||s}
 function guessSido(sgg){const f=SGG.features.filter(x=>x.properties.n===sgg);return f.length===1?f[0].properties.s:''}
@@ -1015,7 +1076,8 @@ $('.brand').addEventListener('dblclick',()=>$('#panel').classList.toggle('full')
 $('#map').addEventListener('pointerdown',()=>$('#panel').classList.remove('full'));
 async function getData(p){try{const r=await fetch(p,{cache:'no-cache'});return r.ok?await r.json():null}catch(e){return null}}
 async function loadAuto(){
-  const [o,p]=await Promise.all([getData('data/ordinances.json'),getData('data/prices.json')]);
+  const [o,p,sa]=await Promise.all([getData('data/ordinances.json'),getData('data/prices.json'),getData('data/substations_area.json')]);
+  if(sa&&sa.items)SUBST_AREA=sa.items;
   if(o){ORD_AUTO=o.items||{};ORD_META=o;buildSgg();staticDialogs();if(R){R.ord=ordFor(R.sido,R.sgg);R.applied=applied(R.ord);judge(R);renderAll()}}
   if(p){const user=LS.get('sms.cfg',{});BASE={...DEF,...p};CFG={...BASE,...user};}
 }

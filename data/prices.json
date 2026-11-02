@@ -1,5 +1,5 @@
 {
- "_설명": "수익분석 기본값. 숫자만 바꾸면 사이트에 반영됩니다. smp·fixed: 원/kWh, rec: 원/REC, cost: 원/kW, om: 원/kW·년, insur·loan·rate·degr: %, loanYears·years: 년, pyeongPerKw: 1kW당 필요 면적(평), roofUse: 지붕 사용률 %, roofPyeongPerKw: 지붕형 1kW당 평, costRoof: 지붕형 시공단가 원/kW",
+ "_설명": "수익분석 기본값. 숫자만 바꾸면 사이트에 반영됩니다. smp·fixed: 원/kWh, rec: 원/REC, cost: 원/kW, om: 원/kW·년, insur·loan·rate·degr: %, loanYears·years: 년, pyeongPerKw: 1kW당 필요 면적(평), roofUse: 지붕 사용률 %, roofPyeongPerKw: 지붕형 1kW당 평, costRoof: 지붕형 시공단가 원/kW, kepcoProxy: 한전 프록시(Cloudflare Worker) 주소",
  "_기준": "SMP·REC: 2026년 10월 3주차 육지 평균(전력거래소·신재생원스톱)",
  "smp": 114,
  "rec": 71400,
@@ -15,5 +15,6 @@
  "degr": 0.5,
  "roofUse": 70,
  "roofPyeongPerKw": 2.5,
- "costRoof": 1150000
+ "costRoof": 1150000,
+ "kepcoProxy": ""
 }

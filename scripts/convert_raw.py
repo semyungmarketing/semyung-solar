@@ -1,6 +1,7 @@
 """
 raw/ 폴더의 원본 파일을 지도 페이지가 읽는 data/*.json 으로 변환합니다.
  - raw/ 안의 조례 엑셀(파일명에 '조례' 포함, .xlsx)       → data/ordinances.json
+ - raw/ 안의 한전 공급가능 변전소 CSV(파일명에 '변전소' 또는 substation 포함) → data/substations_area.json
 GitHub Actions(convert.yml)가 raw/ 에 파일이 올라오면 자동으로 실행합니다.
 """
 import glob, json, os, re, datetime
@@ -100,6 +101,26 @@ def convert_ordinances(path):
     if unmatched:
         print("시·군 경계 이름과 맞지 않아 건너뜀:", ", ".join(sorted(unmatched)))
 
+def convert_substations(path):
+    import csv
+    SIDO_FIX = {"전라북도": "전북특별자치도", "강원도": "강원특별자치도"}
+    out = {}
+    for enc in ("utf-8-sig", "cp949"):
+        try:
+            rows = list(csv.DictReader(open(path, encoding=enc)))
+            break
+        except UnicodeDecodeError:
+            continue
+    for r in rows:
+        sd = SIDO_FIX.get(r["시도"].strip(), r["시도"].strip())
+        k = f'{sd}|{r["시군구"].replace(" ", "")}|{r["읍면동"].strip()}'
+        v = r["공급변전소"].strip()
+        if v and v not in out.setdefault(k, []):
+            out[k].append(v)
+    json.dump({"updated": datetime.date.today().isoformat(), "source": os.path.basename(path), "items": out},
+              open(os.path.join(DATA, "substations_area.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    print(f"공급변전소: 읍면동 {len(out)}곳 → data/substations_area.json")
+
 def newest(*patterns):
     fs = [f for p in patterns for f in glob.glob(os.path.join(RAW, p)) if not os.path.basename(f).startswith("~$")]
     return max(fs, key=os.path.getmtime) if fs else None
@@ -108,3 +129,5 @@ if __name__ == "__main__":
     os.makedirs(DATA, exist_ok=True)
     o = newest("*조례*.xlsx", "*ordinance*.xlsx")
     if o: convert_ordinances(o)
+    c = newest("*변전소*.csv", "*substation*.csv")
+    if c: convert_substations(c)
