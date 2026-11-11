@@ -38,8 +38,11 @@ def parse_dist(text):
             if v is not None: hs.append((seg, v))
         if r is None and "도로" in seg and not re.search(r"삭제|없음|없어|제외|폐지|규정 없", seg):
             r = first_m(seg)
-    law = [v for seg, v in hs if "반경" in seg and re.search(r"5\s*호\s*(↑|이상)", seg) and "미만" not in seg and "특례" not in seg]
-    h = law[0] if law else (hs[0][1] if hs else None)
+    law = [(seg, v) for seg, v in hs if "반경" in seg and re.search(r"5\s*호\s*(↑|이상)", seg) and "미만" not in seg and "특례" not in seg]
+    pick = law[0] if law else (hs[0] if hs else None)
+    h = pick[1] if pick else None
+    m = re.search(r"(\d+)\s*호\s*(↑|이상)", pick[0]) if pick else None   # 기준 호수(예: 10호↑)
+    parse_dist.n = int(m.group(1)) if m else None
     return h, r
 
 def ymd(s):
@@ -79,17 +82,31 @@ def convert_ordinances(path):
         latest_a = max((x["date"] for x in L if x["cls"].startswith("A")), default="")
         if has:
             p = sorted(has, key=rank, reverse=True)[0]
-            h, r = parse_dist(p["now"])
+            h, r = parse_dist(p["now"]); n = parse_dist.n
             if h is None and r is None:
-                h, r = parse_dist(p["review"])
+                h, r = parse_dist(p["review"]); n = parse_dist.n
         else:
             p = sorted(L, key=lambda x: x["date"], reverse=True)[0]
-            h, r = 0, 0
+            h, r, n = 0, 0, None
         it = {"title": p["title"], "cls": p["cls"], "d": p["date"], "dept": p["dept"], "now": p["now"],
               "review": p["review"], "change": p["change"] if p["cls"].startswith("A") else "",
               "url": p["url"], "label": o["label"], "others": [x["title"] for x in L if x is not p][:5]}
         it = {kk: vv for kk, vv in it.items() if vv not in ("", [], None)}
         if h is not None: it["h"] = h
+        if n: it["n"] = n
+        ms = re.search(r"(\d+)\s*호\s*미만\s*호당\s*(\d+)\s*m", p["now"] + " " + p["review"])  # 예: 10호 미만 호당 40m 누적
+        if ms: it["step"] = int(ms.group(2)); it.setdefault("n", int(ms.group(1)))
+        # 배치 관련 조례 기준: 부지경계 완충폭, 모듈 연속 설치 길이·구간 사이 간격, 모듈(어레이) 이격
+        T = p["now"] + " " + p["review"]
+        bufs = [float(x) for x in re.findall(r"완충\s*(?:공간|폭)?\s*(\d+(?:\.\d+)?)\s*m", T)]
+        bufs += [float(x) for x in re.findall(r"(\d+(?:\.\d+)?)\s*m\s*↑?\s*(?:이격\s*)?(?:완충|\+\s*\d)", T) if float(x) <= 10]
+        bufs += [float(x) for x in re.findall(r"경계\S{0,6}\s*(\d+(?:\.\d+)?)\s*m\s*↑?\s*(?:이격|완충)", T)]
+        bufs = [b for b in bufs if 0 < b <= 10]
+        if bufs: it["buf"] = max(bufs)
+        mc = re.search(r"모듈\s*(?:가로\s*)?연속(?:설치)?\s*(\d+)\s*m\s*(?:이내|↓)[^|]{0,25}?(\d+(?:\.\d+)?)\s*m", T)
+        if mc: it["contLen"] = int(mc.group(1)); it["contGap"] = float(mc.group(2))
+        mg = re.search(r"모듈\s*이격\s*(\d+(?:\.\d+)?)\s*m", T)
+        if mg: it["modGap"] = float(mg.group(1))
         if r is not None: it["r"] = r
         if not has: it["note"] = "조례에 태양광 이격거리 조항 없음"
         if latest_a >= CAP_DATE and (h is None or h <= 200) and not (r and r > 0):

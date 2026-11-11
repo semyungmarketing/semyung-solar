@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-02",
+ "updated": "2026-11-11",
  "source": "ordinance.xlsx",
  "count": 164,
  "items": {
@@ -37,6 +37,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42170116000025&histNo=018&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 500,
+   "n": 10,
    "r": 200
   },
   "강원특별자치도|삼척시": {
@@ -78,6 +79,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42800109241002&histNo=021&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 300,
+   "n": 10,
    "r": 200
   },
   "강원특별자치도|양양군": {
@@ -90,6 +92,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42830122278003&histNo=032&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 400,
+   "n": 5,
+   "buf": 2.0,
    "r": 300
   },
   "강원특별자치도|영월군": {
@@ -102,6 +106,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42750134358005&histNo=019&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 500,
+   "n": 5,
    "r": 500
   },
   "강원특별자치도|원주시": {
@@ -130,6 +135,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42810110246027&histNo=017&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 300,
+   "n": 10,
    "r": 100
   },
   "강원특별자치도|정선군": {
@@ -142,6 +148,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42770124213010&histNo=024&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 500,
+   "n": 5,
+   "buf": 2.0,
    "r": 500
   },
   "강원특별자치도|철원군": {
@@ -157,6 +165,7 @@
     "철원군 행정기구설치조례"
    ],
    "h": 500,
+   "n": 10,
    "r": 500
   },
   "강원특별자치도|춘천시": {
@@ -181,6 +190,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42190114391002&histNo=020&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 250,
+   "n": 5,
    "r": 300
   },
   "강원특별자치도|평창군": {
@@ -193,6 +203,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=42760111255028&histNo=024&category=LAW&menuNm=totSrch",
    "label": "강원특별자치도",
    "h": 200,
+   "n": 10,
    "r": 300
   },
   "강원특별자치도|홍천군": {
@@ -221,6 +232,7 @@
     "화천군 행정기구 설치조례"
    ],
    "h": 100,
+   "n": 5,
    "p": "amended"
   },
   "강원특별자치도|횡성군": {
@@ -236,6 +248,7 @@
     "횡성군 농지전용허가 등 민원업무 지원조례"
    ],
    "h": 500,
+   "n": 10,
    "r": 500
   },
   "경기도|가평군": {
@@ -249,6 +262,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=41820113227034&histNo=033&category=LAW&menuNm=totSrch",
    "label": "경기도",
    "h": 200,
+   "buf": 3.0,
    "p": "amended"
   },
   "경기도|고양시": {
@@ -401,7 +415,8 @@
    "now": "태양광(제22조의2): 취락지구 및 100m 이내 불가 / 보전·생산녹지지역 입지 불가 / 국가유산 부지 100m 이내 불가 / 2m 완충. 임야는 경사도 적용. 옥상·지붕 설치는 적용 제외(난간에서 50cm↑ 이격). 구조안전 기술사 검토 요청 가능.",
    "review": "· 취락지구 및 100m 이내 불가\n· 국가유산 100m\n· 보전·생산녹지 불가\n· 완충 2m\n· 지붕·옥상은 제외(난간 50cm 이격)",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=41110137330002&histNo=045&category=LAW&menuNm=totSrch",
-   "label": "경기도"
+   "label": "경기도",
+   "buf": 2.0
   },
   "경기도|시흥시": {
    "title": "시흥시 도시계획 조례",
@@ -473,7 +488,9 @@
    "review": "· 이격: 주거지(5호↑) 100m\n· 완충 2m + 식재·차폐시설\n· 예외: 자가소비·기존 건축물(지붕면적 이내)",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=41630106215070&histNo=030&category=LAW&menuNm=totSrch",
    "label": "경기도",
-   "h": 100
+   "h": 100,
+   "n": 5,
+   "buf": 2.0
   },
   "경기도|양평군": {
    "title": "양평군 도시계획 조례",
@@ -485,6 +502,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=41830141298001&histNo=020&category=LAW&menuNm=totSrch",
    "label": "경기도",
    "h": 300,
+   "n": 10,
+   "buf": 3.0,
    "r": 200
   },
   "경기도|여주시": {
@@ -496,7 +515,9 @@
    "review": "· 이격: 반경 200m 내 주택 5호↑ 불가(협의 시 허가 가능)\n· 우량농지 불가\n· 완충 3m↑ 및 구조물 높이 2배 이격 + 울타리·수목\n· 예외: 공공·자가소비·지붕형·에너지 기본 조례 해당자",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=41670137341015&histNo=036&category=LAW&menuNm=totSrch",
    "label": "경기도",
-   "h": 200
+   "h": 200,
+   "n": 5,
+   "buf": 3.0
   },
   "경기도|연천군": {
    "title": "연천군 군계획조례",
@@ -511,6 +532,8 @@
     "연천군 행정기구 및 정원 조례"
    ],
    "h": 300,
+   "n": 10,
+   "buf": 2.0,
    "r": 200
   },
   "경기도|오산시": {
@@ -576,6 +599,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=41530162393005&histNo=041&category=LAW&menuNm=totSrch",
    "label": "경기도",
    "h": 300,
+   "n": 10,
+   "buf": 5.0,
    "r": 300
   },
   "경기도|파주시": {
@@ -588,6 +613,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=41510109216003&histNo=043&category=LAW&menuNm=totSrch",
    "label": "경기도",
    "h": 100,
+   "n": 10,
+   "buf": 2.0,
    "r": 100
   },
   "경기도|평택시": {
@@ -616,6 +643,8 @@
     "포천시 행정기구 및 정원 조례"
    ],
    "h": 300,
+   "n": 10,
+   "buf": 2.0,
    "r": 200
   },
   "경기도|하남시": {
@@ -654,6 +683,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48310145226003&histNo=032&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 300,
+   "n": 5,
    "r": 500
   },
   "경상남도|거창군": {
@@ -666,6 +696,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48880112000017&histNo=018&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 200,
+   "buf": 2.0,
    "r": 200
   },
   "경상남도|고성군": {
@@ -742,6 +773,7 @@
     "사천시 건축조례"
    ],
    "h": 500,
+   "n": 5,
    "r": 300
   },
   "경상남도|산청군": {
@@ -754,6 +786,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48860125231003&histNo=019&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 500,
+   "n": 5,
+   "buf": 2.0,
    "r": 500
   },
   "경상남도|양산시": {
@@ -782,6 +816,7 @@
     "의령군 자연경관 보전을 위한 조례"
    ],
    "h": 700,
+   "n": 5,
    "r": 500
   },
   "경상남도|진주시": {
@@ -794,6 +829,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48170107228041&histNo=023&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 500,
+   "n": 10,
    "r": 500
   },
   "경상남도|창녕군": {
@@ -806,6 +842,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48740125229020&histNo=019&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 250,
+   "n": 10,
    "r": 6
   },
   "경상남도|창원시": {
@@ -831,6 +868,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48220122367011&histNo=031&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 200,
+   "n": 5,
    "r": 200
   },
   "경상남도|하동군": {
@@ -843,6 +881,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48850136376006&histNo=023&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 500,
+   "n": 5,
    "r": 300
   },
   "경상남도|함안군": {
@@ -855,6 +894,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48730113235002&histNo=031&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 500,
+   "n": 5,
+   "buf": 2.0,
    "r": 400
   },
   "경상남도|함양군": {
@@ -867,6 +908,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48870182604002&histNo=021&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 400,
+   "n": 5,
    "r": 300
   },
   "경상남도|합천군": {
@@ -879,6 +921,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=48890109243016&histNo=021&category=LAW&menuNm=totSrch",
    "label": "경상남도",
    "h": 500,
+   "n": 5,
    "r": 300
   },
   "경상북도|경산시": {
@@ -891,6 +934,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47290105213011&histNo=028&category=LAW&menuNm=totSrch",
    "label": "경상북도",
    "h": 300,
+   "n": 10,
+   "buf": 2.0,
    "r": 300
   },
   "경상북도|경주시": {
@@ -903,6 +948,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47130105217006&histNo=028&category=LAW&menuNm=totSrch",
    "label": "경상북도",
    "h": 200,
+   "n": 10,
    "r": 300
   },
   "경상북도|고령군": {
@@ -952,7 +998,8 @@
    "review": "[개정: 영향 없음]\n· 도로 500m\n· 주거 10호↑ 500m / 5~10호 200m, 인접주택 70m\n· 취락·관광지 500m\n· 경사도 15도 미만, 입목축적 100% 미만",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47280104219008&histNo=020&category=LAW&menuNm=totSrch",
    "label": "경상북도",
-   "h": 500
+   "h": 500,
+   "n": 10
   },
   "경상북도|봉화군": {
    "title": "봉화군 군계획 조례",
@@ -978,6 +1025,7 @@
    "review": "· 이격: 도로 500m / 자연취락·인가 10호↑ 500m·10호 미만 300m / 관광지·관광휴양형 지구단위 1,000m / 국가유산·전통사찰 500m\n· 경지정리 우량농지 불가 / 평균 경사 15도 이하\n· 완충 3m + 울타리 2m",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47250118000002&histNo=028&category=LAW&menuNm=totSrch",
    "label": "경상북도",
+   "buf": 3.0,
    "r": 500
   },
   "경상북도|성주군": {
@@ -994,6 +1042,7 @@
     "성주군 도시계획조례"
    ],
    "h": 200,
+   "n": 5,
    "p": "amended"
   },
   "경상북도|안동시": {
@@ -1006,6 +1055,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47170108223002&histNo=028&category=LAW&menuNm=totSrch",
    "label": "경상북도",
    "h": 500,
+   "n": 10,
+   "buf": 3.0,
    "r": 300
   },
   "경상북도|영덕군": {
@@ -1018,6 +1069,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47770118241005&histNo=020&category=LAW&menuNm=totSrch",
    "label": "경상북도",
    "h": 200,
+   "n": 10,
    "r": 5
   },
   "경상북도|영양군": {
@@ -1040,7 +1092,8 @@
    "review": "· 이격(태양광, 별표27): 도로 500m(차폐·위원회 인정 시 제외) / 인가 10호↑ 500m·5~9호 300m·5호 미만 200m(본인 주택만·차폐 시 제외) / 관광지·관광단지 1,000m\n· 집단화 우량농지, 자연경관 보존지역 불가\n· 2m↑ 경계울타리, 차폐수·차폐막 권고\n· 예외(시장 허가): 공공, 자가소비 건축물 위, 사용승인 건축물 지붕(500kW↑은 위원회), 영주시 3년↑ 거주 100kW 미만 토지 설치(임차 불가)\n· 5인↑ 민원 예상 시 위원회 심의 가능",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47210104218023&histNo=021&category=LAW&menuNm=totSrch",
    "label": "경상북도",
-   "h": 500
+   "h": 500,
+   "n": 10
   },
   "경상북도|영천시": {
    "title": "영천시 도시계획 조례",
@@ -1051,6 +1104,7 @@
    "review": "· 도로 300m\n· 주거(10호↑/미만) 300m/150m\n· 관광지·공공시설·국가유산 500m\n· 완충 3m+울타리 2m",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47230116264003&histNo=025&category=LAW&menuNm=totSrch",
    "label": "경상북도",
+   "buf": 3.0,
    "r": 300
   },
   "경상북도|예천군": {
@@ -1088,6 +1142,7 @@
    "review": "· 주요도로 1,000m\n· 집단화 토지 중앙부·산림 5영급↑ 불가\n· 완충 3m+차폐수 2m\n· 군계획위 심의로 완화 가능",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47930113248008&histNo=012&category=LAW&menuNm=totSrch",
    "label": "경상북도",
+   "buf": 3.0,
    "r": 6
   },
   "경상북도|의성군": {
@@ -1113,7 +1168,9 @@
    "others": [
     "청도군 전원주택단지 조성사업 지원 조례"
    ],
-   "h": 200
+   "h": 200,
+   "n": 5,
+   "buf": 2.0
   },
   "경상북도|청송군": {
    "title": "청송군 도시계획 조례",
@@ -1126,6 +1183,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=47750132360001&histNo=016&category=LAW&menuNm=totSrch",
    "label": "경상북도",
    "h": 200,
+   "n": 5,
+   "buf": 2.0,
    "p": "amended"
   },
   "경상북도|칠곡군": {
@@ -1325,6 +1384,7 @@
     "고흥군 향토문화재 보호 관리에 관한 조례"
    ],
    "h": 500,
+   "n": 10,
    "r": 500
   },
   "전라남도|곡성군": {
@@ -1369,6 +1429,7 @@
     "구례군 경관관리 조례"
    ],
    "h": 200,
+   "n": 5,
    "p": "amended"
   },
   "전라남도|나주시": {
@@ -1432,6 +1493,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=12110138220009&histNo=021&category=LAW&menuNm=totSrch",
    "label": "전남광주통합특별시",
    "h": 100,
+   "n": 10,
    "r": 6
   },
   "전라남도|무안군": {
@@ -1448,6 +1510,7 @@
     "무안군 향토문화유산 보호 조례"
    ],
    "h": 200,
+   "n": 10,
    "r": 200
   },
   "전라남도|보성군": {
@@ -1465,6 +1528,7 @@
     "보성군 신에너지ㆍ재생에너지 발전사업에 대한 주민참여 및 개발이익 공유에 관한 조례"
    ],
    "h": 500,
+   "n": 10,
    "r": 500
   },
   "전라남도|순천시": {
@@ -1477,6 +1541,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=12150105215009&histNo=041&category=LAW&menuNm=totSrch",
    "label": "전남광주통합특별시",
    "h": 500,
+   "n": 10,
    "r": 200
   },
   "전라남도|신안군": {
@@ -1493,7 +1558,9 @@
     "신안군 조류발전사업 육성 및 증진에 관한 조례",
     "신안군 축제식 양식장에 의한 농작물 피해보상에 관한 조례"
    ],
-   "h": 100
+   "h": 100,
+   "n": 10,
+   "buf": 2.0
   },
   "전라남도|여수시": {
    "title": "여수시 도시계획 조례",
@@ -1525,6 +1592,7 @@
     "영광군 재생에너지산업 육성에 관한 조례"
    ],
    "h": 300,
+   "n": 10,
    "r": 100
   },
   "전라남도|영암군": {
@@ -1540,6 +1608,7 @@
     "영암군 향토문화유산 보호 조례"
    ],
    "h": 300,
+   "n": 5,
    "r": 100
   },
   "전라남도|완도군": {
@@ -1555,7 +1624,8 @@
     "완도군 경관 조례",
     "완도군 재생에너지산업 육성 및 군민참여와 개발이익공유에 관한 조례"
    ],
-   "h": 500
+   "h": 500,
+   "n": 5
   },
   "전라남도|장성군": {
    "title": "장성군 도시계획 조례",
@@ -1582,6 +1652,7 @@
     "장흥군 신ㆍ재생에너지 발전사업 개발이익 공유에 관한 조례"
    ],
    "h": 500,
+   "n": 10,
    "r": 1000
   },
   "전라남도|진도군": {
@@ -1633,6 +1704,7 @@
     "해남군 경관 및 공공디자인 조례"
    ],
    "h": 500,
+   "n": 10,
    "r": 100
   },
   "전라남도|화순군": {
@@ -1646,6 +1718,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=12760114244006&histNo=029&category=LAW&menuNm=totSrch",
    "label": "전남광주통합특별시",
    "h": 200,
+   "n": 5,
    "p": "amended"
   },
   "전북특별자치도|고창군": {
@@ -1658,6 +1731,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52790126218004&histNo=025&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
    "h": 300,
+   "n": 5,
    "r": 300
   },
   "전북특별자치도|군산시": {
@@ -1670,6 +1744,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52130106218001&histNo=033&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
    "h": 150,
+   "buf": 2.0,
    "r": 150
   },
   "전북특별자치도|김제시": {
@@ -1696,6 +1771,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52190118496001&histNo=033&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
    "h": 200,
+   "n": 5,
    "p": "amended"
   },
   "전북특별자치도|무주군": {
@@ -1711,6 +1787,8 @@
     "무주군 행정기구 설치 조례"
    ],
    "h": 500,
+   "n": 5,
+   "buf": 3.0,
    "r": 250
   },
   "전북특별자치도|부안군": {
@@ -1726,6 +1804,8 @@
     "부안군 행정기구 설치 조례"
    ],
    "h": 300,
+   "n": 10,
+   "modGap": 2.0,
    "r": 150
   },
   "전북특별자치도|순창군": {
@@ -1751,6 +1831,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52710108234028&histNo=035&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
    "h": 200,
+   "buf": 2.0,
    "r": 200
   },
   "전북특별자치도|익산시": {
@@ -1763,6 +1844,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52140219238006&histNo=044&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
    "h": 100,
+   "n": 10,
    "r": 6
   },
   "전북특별자치도|임실군": {
@@ -1775,6 +1857,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52750131271033&histNo=022&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
    "h": 300,
+   "n": 5,
+   "buf": 1.0,
    "r": 100
   },
   "전북특별자치도|장수군": {
@@ -1788,6 +1872,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52740109227019&histNo=026&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
    "h": 150,
+   "step": 30,
+   "n": 5,
    "r": 100
   },
   "전북특별자치도|전주시": {
@@ -1819,6 +1905,7 @@
     "정읍시 경관 조례"
    ],
    "h": 100,
+   "n": 10,
    "r": 100
   },
   "전북특별자치도|진안군": {
@@ -1830,7 +1917,8 @@
    "review": "· 이격: 주거밀집(5호↑) 500m / 공원·관광지 200m / 주요도로 250m\n· 풍력: 주거밀집·기반시설 2,000m\n· 우량농지(경지정리) 내 불가\n· 이격 저촉 시 250m 내 주민 60%↑ 설명회·회의록\n· 예외: 공공·산단·협동조합 출자·3년↑ 건축물 지붕",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=52720110242060&histNo=021&category=LAW&menuNm=totSrch",
    "label": "전북특별자치도",
-   "h": 500
+   "h": 500,
+   "n": 5
   },
   "충청남도|계룡시": {
    "title": "계룡시 도시계획 조례",
@@ -1842,6 +1930,9 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44250110000004&histNo=043&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 200,
+   "n": 10,
+   "contLen": 100,
+   "contGap": 3.0,
    "r": 200
   },
   "충청남도|공주시": {
@@ -1857,6 +1948,8 @@
     "공주시 경관 조례"
    ],
    "h": 300,
+   "n": 10,
+   "step": 20,
    "r": 200
   },
   "충청남도|금산군": {
@@ -1869,6 +1962,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44710113237004&histNo=025&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 300,
+   "n": 10,
    "r": 200
   },
   "충청남도|논산시": {
@@ -1882,6 +1976,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44230106271009&histNo=034&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 200,
+   "n": 5,
+   "buf": 3.0,
    "p": "amended"
   },
   "충청남도|당진시": {
@@ -1894,6 +1990,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44270122290028&histNo=028&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 500,
+   "buf": 3.0,
    "r": 200
   },
   "충청남도|보령시": {
@@ -1907,6 +2004,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44180128262003&histNo=031&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 200,
+   "n": 5,
    "p": "amended"
   },
   "충청남도|부여군": {
@@ -1920,6 +2018,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44760111256004&histNo=028&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 1000,
+   "n": 10,
    "r": 300
   },
   "충청남도|서산시": {
@@ -1932,6 +2031,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44210104216022&histNo=033&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 300,
+   "n": 10,
    "r": 200
   },
   "충청남도|서천군": {
@@ -1944,6 +2044,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44770147428002&histNo=025&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 500,
+   "n": 10,
+   "buf": 3.0,
    "r": 300
   },
   "충청남도|아산시": {
@@ -1959,6 +2061,8 @@
     "아산시 자연재해위험개선지구에서의 행위제한에 관한 조례"
    ],
    "h": 500,
+   "n": 10,
+   "step": 40,
    "r": 200
   },
   "충청남도|예산군": {
@@ -1971,6 +2075,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44810113257006&histNo=024&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 500,
+   "n": 10,
+   "buf": 3.0,
    "r": 100
   },
   "충청남도|천안시": {
@@ -1988,6 +2094,10 @@
     "천안시 자연재해위험개선지구 안에서의 행위제한에 관한 조례"
    ],
    "h": 200,
+   "n": 5,
+   "buf": 4.0,
+   "contLen": 100,
+   "contGap": 3.0,
    "p": "amended"
   },
   "충청남도|청양군": {
@@ -2001,6 +2111,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=44790140311002&histNo=026&category=LAW&menuNm=totSrch",
    "label": "충청남도",
    "h": 500,
+   "n": 5,
+   "buf": 3.0,
    "r": 200
   },
   "충청남도|태안군": {
@@ -2016,6 +2128,11 @@
     "태안군 해상풍력 발전단지의 체계적 개발 및 지원 등에 관한 조례"
    ],
    "h": 400,
+   "n": 8,
+   "step": 50,
+   "buf": 3.0,
+   "contLen": 100,
+   "contGap": 3.0,
    "r": 200
   },
   "충청남도|홍성군": {
@@ -2032,6 +2149,9 @@
     "홍성군 경관 조례"
    ],
    "h": 200,
+   "n": 5,
+   "contLen": 100,
+   "contGap": 3.0,
    "p": "amended"
   },
   "충청북도|괴산군": {
@@ -2047,6 +2167,8 @@
     "괴산군 건축 조례"
    ],
    "h": 500,
+   "n": 5,
+   "buf": 2.0,
    "r": 200
   },
   "충청북도|단양군": {
@@ -2059,6 +2181,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=43800124000022&histNo=013&category=LAW&menuNm=totSrch",
    "label": "충청북도",
    "h": 300,
+   "buf": 2.0,
    "r": 300
   },
   "충청북도|보은군": {
@@ -2098,6 +2221,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=43730125259007&histNo=020&category=LAW&menuNm=totSrch",
    "label": "충청북도",
    "h": 200,
+   "n": 5,
+   "buf": 2.0,
    "p": "amended"
   },
   "충청북도|음성군": {
@@ -2110,6 +2235,8 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=43770127238018&histNo=021&category=LAW&menuNm=totSrch",
    "label": "충청북도",
    "h": 200,
+   "n": 5,
+   "buf": 2.0,
    "r": 200
   },
   "충청북도|제천시": {
@@ -2122,6 +2249,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=43150105203004&histNo=024&category=LAW&menuNm=totSrch",
    "label": "충청북도",
    "h": 300,
+   "n": 5,
    "r": 500
   },
   "충청북도|증평군": {
@@ -2149,6 +2277,7 @@
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=43750113253012&histNo=019&category=LAW&menuNm=totSrch",
    "label": "충청북도",
    "h": 200,
+   "buf": 2.0,
    "r": 200
   },
   "충청북도|청주시": {
@@ -2160,7 +2289,9 @@
    "review": "[개정: 영향]\n· 이격(태양광발전시설, 별표1 제10호): 도로 100m(고속·국·지·시군도·농어촌도로(농도 제외)·도시계획도로) / 부지 반경 200m 내 5호↑ 가구(5호 미만은 100m) / 관광지·문화유산 등 500m\n· 부지경계 2m↑ 이격 완충+2m↑ 울타리, 차폐식재 권고\n· 예외(시장 허가 가능): 공공 설치, 자가소비, 사용승인 5년↑ 건축물 위, 대·공장용지·학교용지 등 지목의 건축물 및 개축·재축 축사 위",
    "url": "https://www.elis.go.kr/allalr/selectAlrBdtOne?alrNo=43990221271006&histNo=024&category=LAW&menuNm=totSrch",
    "label": "충청북도",
-   "h": 200
+   "h": 200,
+   "n": 5,
+   "buf": 2.0
   },
   "충청북도|충주시": {
    "title": "충주시 도시계획 조례",

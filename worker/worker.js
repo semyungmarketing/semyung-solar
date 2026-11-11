@@ -23,6 +23,7 @@ export default {
     try {
       if (url.pathname === "/lead") return await saveLead(request, env, cors);
       if (url.pathname === "/login") return await adminLogin(request, env, cors);
+      if (url.pathname === "/bld") return await buildingRegister(url, env, cors);
       if (url.pathname === "/verify") return json({ ok: await verifyToken(url.searchParams.get("t") || "", env) }, 200, { ...cors, "Cache-Control": "no-store" });
       if (url.pathname.startsWith("/admin")) return await admin(request, env, url);
       return await kepco(url, env, cors);
@@ -55,6 +56,35 @@ async function kepco(url, env, cors) {
   q.set("returnType", "json");
   const r = await fetch("https://bigdata.kepco.co.kr/openapi/v1/dispersedGeneration.do?" + q.toString(), { cf: { cacheTtl: 21600, cacheEverything: true } });
   return new Response(await r.text(), { status: r.status, headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=21600" } });
+}
+
+/* ---------- 건축물대장 표제부 (국토교통부 건축HUB, 공공데이터포털) ---------- */
+// PNU 19자리 = 시군구(5) + 법정동(5) + 토지구분(1: 일반, 2: 산) + 본번(4) + 부번(4)
+async function buildingRegister(url, env, cors) {
+  const pnu = (url.searchParams.get("pnu") || "").replace(/[^0-9]/g, "");
+  if (pnu.length !== 19) return json({ error: "pnu(19자리)가 필요합니다" }, 400, cors);
+  if (!env.DATA_GO_KR_KEY) return json({ error: "Worker에 DATA_GO_KR_KEY 비밀값이 없습니다" }, 500, cors);
+  const q = new URLSearchParams({
+    // 공공데이터포털 Encoding/Decoding 어느 키를 넣어도 작동하도록 한 번만 풀어 씀
+    serviceKey: /%[0-9A-Fa-f]{2}/.test(env.DATA_GO_KR_KEY) ? decodeURIComponent(env.DATA_GO_KR_KEY.trim()) : env.DATA_GO_KR_KEY.trim(), sigunguCd: pnu.slice(0, 5), bjdongCd: pnu.slice(5, 10),
+    platGbCd: pnu[10] === "2" ? "1" : "0", bun: pnu.slice(11, 15), ji: pnu.slice(15, 19),
+    numOfRows: "100", pageNo: "1", _type: "json",
+  });
+  const r = await fetch("https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?" + q.toString(), { cf: { cacheTtl: 86400, cacheEverything: true } });
+  const text = await r.text();
+  let d;
+  try { d = JSON.parse(text); } catch (e) { return json({ error: "건축물대장 응답 오류", detail: text.slice(0, 300) }, 502, cors); }
+  const head = d.response && d.response.header;
+  if (head && head.resultCode && head.resultCode !== "00") return json({ error: head.resultMsg || head.resultCode }, 502, cors);
+  let items = d.response && d.response.body && d.response.body.items && d.response.body.items.item;
+  items = !items ? [] : Array.isArray(items) ? items : [items];
+  const pick = (o) => ({
+    bldNm: o.bldNm || "", dongNm: o.dongNm || "", mainAtch: o.mainAtchGbCdNm || "", purpose: o.mainPurpsCdNm || "", etcPurpose: o.etcPurps || "",
+    strct: o.strctCdNm || "", roof: o.roofCdNm || o.etcRoof || "", floors: Number(o.grndFlrCnt) || 0, bfloors: Number(o.ugrndFlrCnt) || 0,
+    height: Number(o.heit) || 0, archArea: Number(o.archArea) || 0, totArea: Number(o.totArea) || 0, useAprDay: o.useAprDay || "",
+    hhld: Number(o.hhldCnt) || 0, fmly: Number(o.fmlyCnt) || 0, ho: Number(o.hoCnt) || 0, addr: o.newPlatPlc || o.platPlc || "",
+  });
+  return json({ ok: true, count: items.length, items: items.map(pick) }, 200, { ...cors, "Cache-Control": "public, max-age=86400" });
 }
 
 /* ---------- 데이터베이스 ---------- */
