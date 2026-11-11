@@ -1179,7 +1179,11 @@ function engineOpts(r,c){const g=r&&isGround(r);c=c||{};return{module:curMod().c
 /* 최대 배치: 모듈 방향 × 정렬(지붕선/정남) × 적층 단수(자동,1~4)를 모두 계산기 엔진으로 돌려 가장 많이 들어가는 조합을 고름 */
 function searchCandidates(){
   if(CFG.layMode!=='max')return[{orientation:CFG.orient,alignMode:'roofline',tier:null}];
-  const out=[];for(const o of ['portrait','landscape'])for(const a of ['roofline','south'])for(const t of [null,1,2,3,4])out.push({orientation:o,alignMode:a,tier:t});return out;
+  // 적층 단수를 고정(1~N단)해서 한 줄의 패널 높이가 모두 같도록. N은 뒷다리 5m(앞다리 0.8m) 안에서 가능한 최대
+  const out=[],t=CFG.tilt*Math.PI/180,m=curMod();
+  for(const o of ['portrait','landscape']){const slant=o==='portrait'?m.h:m.w,maxN=Math.max(1,Math.min(8,Math.floor((5-0.8)/Math.max(slant*Math.sin(t),1e-6))));
+    for(const a of ['roofline','south'])for(let n=1;n<=maxN;n++)out.push({orientation:o,alignMode:a,tier:n})}
+  return out;
 }
 const candLabel=c=>`${c.orientation==='landscape'?'가로형':'세로형'} · ${c.alignMode==='south'?'정남 정렬':'경계선 정렬'} · ${c.tier?c.tier+'단 적층':'적층 자동'}`;
 function roofLayout(r){
@@ -1250,10 +1254,18 @@ function build3D(r,Lay){
     let d=Math.abs(e1[1])/l1>Math.abs(e2[1])/l2?e1:e2;const dl=Math.hypot(...d);let f=[d[0]/dl,d[1]/dl];if(f[1]>0)f=[-f[0],-f[1]];
     const roof=roofs.find(o=>turf.booleanPointInPolygon(turf.point([lon0+cx/kx,lat0+cy/ky]),o.f));
     return {pts,cx,cy,f,depth:dl,h:r.mode==='ground'?0:(roof?roof.h:7)}});
-  const key=(x,y)=>Math.round(x/0.4)+','+Math.round(y/0.4);const idx=new Map();mods.forEach((m,i)=>idx.set(key(m.cx,m.cy),i));
-  const tier=new Array(mods.length).fill(-1);
-  const order=mods.map((m,i)=>i).sort((a,b)=>(mods[a].cx*mods[a].f[0]+mods[a].cy*mods[a].f[1])-(mods[b].cx*mods[b].f[0]+mods[b].cy*mods[b].f[1])).reverse();
-  for(const i of order){const m=mods[i];const j=idx.get(key(m.cx+m.f[0]*m.depth,m.cy+m.f[1]*m.depth));tier[i]=(j!==undefined&&tier[j]>=0)?tier[j]+1:0}
+  // 적층 단: 같은 프레임(가까이 붙은 패널 묶음) 안에서 앞쪽 끝선부터의 위치로 정함 → 같은 줄 패널은 높이가 모두 같음
+  const tier=new Array(mods.length).fill(0);
+  {const cell=6,grid=new Map();mods.forEach((m,i)=>{const k=Math.floor(m.cx/cell)+','+Math.floor(m.cy/cell);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(i)});
+   const comp=new Array(mods.length).fill(-1);let nc=0;
+   for(let i=0;i<mods.length;i++){if(comp[i]>=0)continue;const st=[i];comp[i]=nc;while(st.length){const j=st.pop(),m=mods[j],gx=Math.floor(m.cx/cell),gy=Math.floor(m.cy/cell);
+     for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(const k of grid.get((gx+dx)+','+(gy+dy))||[]){if(comp[k]>=0)continue;const o=mods[k];
+       // 같은 프레임: 앞뒤로 정확히 한 장 깊이 또는 같은 줄(옆)으로 붙어 있음
+       const ds=Math.abs((o.cx-m.cx)*m.f[0]+(o.cy-m.cy)*m.f[1]),dw=Math.abs((o.cx-m.cx)*-m.f[1]+(o.cy-m.cy)*m.f[0]);
+       if((ds<0.3&&dw<3)||(Math.abs(ds-m.depth)<0.3&&dw<0.6)){comp[k]=nc;st.push(k)}}}nc++}
+   for(let c=0;c<nc;c++){const ids=mods.map((m,i)=>i).filter(i=>comp[i]===c);const f=mods[ids[0]].f,d=mods[ids[0]].depth;
+     const sv=ids.map(i=>mods[i].cx*f[0]+mods[i].cy*f[1]),front=Math.max(...sv);
+     ids.forEach((i,k)=>tier[i]=Math.max(0,Math.round((front-sv[k])/d)))}}
   const pos=[],gap=0.92;
   mods.forEach((m,i)=>{const rise=t?m.depth*Math.tan(t):0;const base=m.h+leg+tier[i]*rise;
     const corner=p=>{const sx=m.cx+(p[0]-m.cx)*gap,sy=m.cy+(p[1]-m.cy)*gap;const s=((sx-m.cx)*m.f[0]+(sy-m.cy)*m.f[1])/m.depth; // +0.5=앞, -0.5=뒤
