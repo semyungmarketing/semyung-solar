@@ -3634,7 +3634,7 @@ window.SMS_LAYOUT = function(rings, opts){
   const saved = Object.assign({}, DEFAULT_ZONE_CONFIG);
   try{
     if(opts.module && MODULES[opts.module]){ DEFAULT_ZONE_CONFIG.moduleKey = opts.module; moduleSelect.value = opts.module; }
-    ['orientation','tilt','shadeAngle','setback'].forEach(k => { if(opts[k] !== undefined && opts[k] !== null) DEFAULT_ZONE_CONFIG[k] = opts[k]; });
+    ['orientation','tilt','shadeAngle','setback','roofType'].forEach(k => { if(opts[k] !== undefined && opts[k] !== null) DEFAULT_ZONE_CONFIG[k] = opts[k]; });
     const perZone = [];
     rings.forEach((ring, i) => {
       const pts = ring.map(p => L.latLng(p[0], p[1]));

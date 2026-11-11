@@ -586,7 +586,8 @@ function makeTarget(lat,lon,geom){
   return {f:null,dist:(x,y)=>turf.distance([lon,lat],[x,y],{units:'meters'}),verts:[[lon,lat]]};
 }
 
-async function stepParcel(r,drawn){
+async function stepParcel(r,drawn,meta){
+  if(drawn&&meta){r.parcel={geo:drawn,addr:meta.addr,pnu:meta.pnu,jibun:meta.jibun,jibunNo:meta.jibunNo,jimokCode:meta.jimokCode,jimok:meta.jimok,jiga:meta.jiga,area:turf.area(drawn)};r.parcels=meta.list;return `${meta.list.length}필지 합계 ${nf(r.parcel.area)}㎡`}
   if(drawn){r.parcel={geo:drawn,addr:'직접 그린 범위',jimok:null,area:turf.area(drawn)};return '직접 그린 범위 사용'}
   const fs=await vwData('LP_PA_CBND_BUBUN',`POINT(${r.lon} ${r.lat})`,5);
   if(!fs.length) throw new Error('필지 없음');
@@ -769,13 +770,13 @@ function substArea(r){
 
 let busy=false;
 const RESULT_CACHE=new Map();
-async function analyze(ll,drawn){
+async function analyze(ll,drawn,meta){
   if(busy)return;
   if(!leadDone()){prefillGate();$('#dlgAgree').showModal();return}
   const lat=ll.lat,lon=ll.lng;
   const sg=findSgg(lat,lon);
   if(!sg){toast('국내 육지 필지를 선택하세요.');return}
-  const r={lat,lon,t0:Date.now(),sido:sg.s,sgg:sg.n,drawn:drawn||null,modeUser:R&&R.modeUser&&drawn?R.modeUser:null};
+  const r={lat,lon,t0:Date.now(),sido:sg.s,sgg:sg.n,drawn:meta?null:(drawn||null),modeUser:R&&R.modeUser&&drawn?R.modeUser:null};
   r.ord=ordFor(sg.s,sg.n);r.applied=applied(r.ord);
   busy=true;stepUI();$('#loading').classList.add('on');$('#hintbar').style.display='none';
   const timer=setInterval(()=>$('#elapsed').textContent=Math.round((Date.now()-r.t0)/1000),300);
@@ -783,7 +784,7 @@ async function analyze(ll,drawn){
   const sec=()=>((Date.now()-r.t0)/1000).toFixed(1)+'초';
   const run=async(id,fn)=>{step(id,'run');try{const t=await fn();step(id,'done',`${t} · ${sec()}`);(r.time=r.time||{})[id]=sec();return true}catch(e){const m=e&&e.message||'실패';step(id,'fail',`${m} · ${sec()}`);(r.err=r.err||{})[id]=m;(r.time=r.time||{})[id]=sec();return false}};
   // 모든 조회를 동시에 시작
-  const pParcel=(CFG.vkey||drawn)?run('parcel',()=>stepParcel(r,drawn)):(step('parcel','fail','키 없음: 위치 기준'),Promise.resolve());
+  const pParcel=(CFG.vkey||drawn)?run('parcel',()=>stepParcel(r,drawn,meta)):(step('parcel','fail','키 없음: 위치 기준'),Promise.resolve());
   const pZone=CFG.vkey?run('zone',()=>stepZone(r)):(step('zone','fail','키 없음'),Promise.resolve());
   step('near','run');const pNear=fetchNear(r);
   const pSun=run('sun',()=>stepSun(r));
@@ -878,7 +879,7 @@ function drawResult(r){
   const c=[r.lat,r.lon];
   if(r.parcel&&r.parcel.geo){L.geoJSON(r.parcel.geo,{style:{color:'#F2A900',weight:3,fillColor:'#F2A900',fillOpacity:.18}}).addTo(judgeLayer)}
   (r.roofs||[]).forEach(b=>L.geoJSON(b.geo,{style:{color:'#1a73e8',weight:2,fillColor:'#4dabf7',fillOpacity:r.mode==='roof'?.12:.15}}).bindTooltip(`${esc(b.name||'건물')} · 지붕 ${nf(b.area)}㎡`).addTo(judgeLayer));
-  if(r.mode==='roof'&&(r.roofs||[]).length){const Lr=roofLayout(r);const pr=L.canvas({padding:.3});const eng=Lr.source==='engine';(Lr.quads||[]).forEach(q=>L.polygon(q,{renderer:pr,color:eng?'#0b2a6b':'#7a8aa8',weight:.5,fillColor:eng?'#1d4ed8':'#9fb3d9',fillOpacity:eng?.8:.45,interactive:false}).addTo(judgeLayer))}
+  if(((r.mode==='roof'&&(r.roofs||[]).length)||(r.mode==='ground'&&r.parcel&&r.parcel.geo))&&!r.nearPending){const Lr=roofLayout(r);const pr=L.canvas({padding:.3});const eng=Lr.source==='engine';(Lr.quads||[]).forEach(q=>L.polygon(q,{renderer:pr,color:eng?'#0b2a6b':'#7a8aa8',weight:.5,fillColor:eng?'#1d4ed8':'#9fb3d9',fillOpacity:eng?.8:.45,interactive:false}).addTo(judgeLayer))}
   L.circleMarker(c,{radius:7,color:'#fff',weight:2,fillColor:'#0F3D2E',fillOpacity:1}).bindTooltip('판정지점',{permanent:false}).addTo(judgeLayer);
   const a=r.applied;
   const ring=(m,color,label)=>{if(!m)return;const g=r.parcel&&r.parcel.geo?turf.buffer(turf.feature(r.parcel.geo),m/1000,{units:'kilometers',steps:24}):turf.circle([r.lon,r.lat],m/1000,{units:'kilometers',steps:64});L.geoJSON(g,{style:{color,weight:2,dashArray:'6 6',fill:false}}).bindTooltip(label,{sticky:true}).addTo(judgeLayer)};
@@ -943,12 +944,23 @@ function packOne(ring,o){
   const quads=best.rects.slice(0,4000).map(([x,y,w,h])=>[toLL(x,y),toLL(x+w,y),toLL(x+w,y+h),toLL(x,y+h)]);
   return {count:best.count,N:best.N,pitch:best.pitch,quads,devDeg:dev*180/Math.PI};
 }
+/* 배치 대상: 지붕형=필지 안 건물 지붕, 지상형=필지(건물 자리는 빼고) */
+function layoutTargets(r){
+  if(r.mode==='ground'){const g=r.parcel&&r.parcel.geo;return g?[{geo:g}]:[]}
+  return r.roofs||[];
+}
+const isGround=r=>r.mode==='ground';
+function dropOnBuildings(r,quads){
+  if(!isGround(r)||!(r.roofs||[]).length)return quads;
+  const fs=r.roofs.map(b=>turf.feature(b.geo));
+  return quads.filter(q=>{const c=[q.reduce((s,p)=>s+p[1],0)/q.length,q.reduce((s,p)=>s+p[0],0)/q.length];const pt=turf.point(c);return !fs.some(f=>turf.booleanPointInPolygon(pt,f))});
+}
 function approxLayout(r){
-  const mod=curMod();const o={mod,orient:CFG.orient,flush:CFG.arrMode==='flush',tilt:CFG.tilt,shade:CFG.shade,setback:CFG.setback,maxLeg:5,frontLeg:0.8};
-  const key=JSON.stringify([CFG.module,o.orient,o.flush,o.tilt,o.shade,o.setback,(r.roofs||[]).length,Math.round(r.roofArea||0)]);
+  const mod=curMod();const o={mod,orient:CFG.orient,flush:CFG.arrMode==='flush'&&!isGround(r),tilt:CFG.tilt,shade:CFG.shade,setback:CFG.setback,maxLeg:5,frontLeg:0.8};
+  const key=JSON.stringify([r.mode,CFG.module,o.orient,o.flush,o.tilt,o.shade,o.setback,(r.roofs||[]).length,Math.round(r.roofArea||0)]);
   if(r._lay&&r._layKey===key)return r._lay;
   let count=0,quads=[],devW=0,devS=0,blds=[];
-  for(const b of r.roofs||[]){
+  for(const b of layoutTargets(r)){
     let geo=b.geo;
     try{const f=turf.buffer(turf.feature(b.geo),-o.setback,{units:'meters'});geo=f&&f.geometry}catch(e){geo=null}
     let bc=0;
@@ -956,6 +968,7 @@ function approxLayout(r){
     b.modules=bc;
   }
   const dev=devS?devW/devS:0;
+  quads=dropOnBuildings(r,quads);count=quads.length;
   const lay={count,kw:count*mod.pmax/1000,quads,devDeg:dev,mod,flush:o.flush,tiers:blds.length?Math.max(...blds.map(x=>x.N||0)):0};
   r._lay=lay;r._layKey=key;return lay;
 }
@@ -975,17 +988,17 @@ function calcEngine(){
   calcReady.catch(()=>{calcReady=null});
   return calcReady;
 }
-function engineOpts(){return{module:curMod().calcKey,orientation:CFG.orient,tilt:CFG.arrMode==='flush'?0:CFG.tilt,shadeAngle:CFG.shade,setback:CFG.setback}}
+function engineOpts(r){const g=r&&isGround(r);return{module:curMod().calcKey,orientation:CFG.orient,tilt:(!g&&CFG.arrMode==='flush')?0:CFG.tilt,shadeAngle:CFG.shade,setback:CFG.setback,roofType:'flat'}} // 토지도 평지로 계산(계산기 'land'는 경사 단면을 그려야 정상 작동)
 function roofLayout(r){
   const ap=approxLayout(r);
-  const rings=(r.roofs||[]).map(b=>ringsOuter(b.geo)[0]).filter(Boolean).map(rg=>rg.map(p=>[p[1],p[0]]));
+  const rings=layoutTargets(r).flatMap(b=>ringsOuter(b.geo)).filter(Boolean).map(rg=>rg.map(p=>[p[1],p[0]]));
   if(!rings.length)return {...ap,source:'none'};
-  const key=JSON.stringify([engineOpts(),rings.length,Math.round(r.roofArea||0)]);
+  const key=JSON.stringify([r.mode,engineOpts(r),rings.length,Math.round(r.roofArea||0),Math.round(r.parcel&&r.parcel.area||0)]);
   if(r._eng&&r._engKey===key)return r._eng;
   if(r._engJob!==key&&r._engErrKey!==key){
     r._engJob=key;r._engErr=null;
-    calcEngine().then(w=>{const x=w.SMS_LAYOUT(rings,engineOpts());if(!x||!x.ok)throw new Error('계산 실패');
-        r._eng={count:x.count,kw:x.kw,quads:x.rects,perZone:x.perZone,mod:curMod(),flush:CFG.arrMode==='flush',devDeg:ap.devDeg,tiers:0,source:'engine',version:x.version};r._engKey=key;})
+    calcEngine().then(w=>{const x=w.SMS_LAYOUT(rings,engineOpts(r));if(!x||!x.ok)throw new Error('계산 실패');
+        const q=dropOnBuildings(r,x.rects);r._eng={count:q.length,kw:q.length*curMod().pmax/1000,quads:q,perZone:x.perZone,mod:curMod(),flush:CFG.arrMode==='flush'&&!isGround(r),devDeg:ap.devDeg,tiers:0,source:'engine',version:x.version};r._engKey=key;})
       .catch(e=>{r._engErr=e.message;r._engErrKey=key})
       .finally(()=>{if(r._engJob===key)r._engJob=null;if(R===r){judge(r);drawResult(r);renderAll()}});
   }
@@ -999,7 +1012,7 @@ const needThree=()=>window.THREE?Promise.resolve():loadScript('https://cdnjs.clo
 let V3=null;
 function bldHeight(b){const f=+b.floors;return f>0?Math.min(f,40)*3.6:7}
 async function open3D(r){
-  if(!r||r.mode!=='roof'||!(r.roofs||[]).length){toast('지붕 건물이 있어야 3D로 볼 수 있습니다.');return}
+  if(!r||(r.mode==='roof'&&!(r.roofs||[]).length)||(r.mode==='ground'&&!(r.parcel&&r.parcel.geo))){toast('필지 경계나 지붕 건물이 있어야 3D로 볼 수 있습니다.');return}
   $('#dlg3d').showModal();$('#v3msg').textContent='3D 화면을 준비하고 있습니다…';
   try{await needThree()}catch(e){$('#v3msg').textContent='3D 프로그램을 불러오지 못했습니다.';return}
   const Lay=roofLayout(r);
@@ -1031,13 +1044,13 @@ function build3D(r,Lay){
   const roofs=(r.roofs||[]).map(b=>({b,h:bldHeight(b),f:turf.feature(b.geo)}));
   roofs.forEach(o=>extr(o.b.geo,o.h,0xe9ece8));
   // 모듈: 앞(남쪽) 가장자리는 낮게, 뒤는 경사만큼 높게. 앞 모듈과 붙어 있으면 연속 적층으로 한 단씩 올림
-  const t=Lay.flush?0:CFG.tilt*Math.PI/180,leg=Lay.flush?0.15:0.5;
+  const t=Lay.flush?0:CFG.tilt*Math.PI/180,leg=Lay.flush?0.15:(r.mode==='ground'?0.8:0.5);
   const mods=(Lay.quads||[]).map(q=>{const pts=q.map(p=>XY([p[1],p[0]]));const cx=pts.reduce((s,p)=>s+p[0],0)/pts.length,cy=pts.reduce((s,p)=>s+p[1],0)/pts.length;
     const e1=[pts[1][0]-pts[0][0],pts[1][1]-pts[0][1]],e2=[pts[3][0]-pts[0][0],pts[3][1]-pts[0][1]];const l1=Math.hypot(...e1),l2=Math.hypot(...e2);
     // 경사 방향(깊이) 축: 남쪽 성분이 더 큰 축
     let d=Math.abs(e1[1])/l1>Math.abs(e2[1])/l2?e1:e2;const dl=Math.hypot(...d);let f=[d[0]/dl,d[1]/dl];if(f[1]>0)f=[-f[0],-f[1]];
     const roof=roofs.find(o=>turf.booleanPointInPolygon(turf.point([lon0+cx/kx,lat0+cy/ky]),o.f));
-    return {pts,cx,cy,f,depth:dl,h:roof?roof.h:7}});
+    return {pts,cx,cy,f,depth:dl,h:r.mode==='ground'?0:(roof?roof.h:7)}});
   const key=(x,y)=>Math.round(x/0.4)+','+Math.round(y/0.4);const idx=new Map();mods.forEach((m,i)=>idx.set(key(m.cx,m.cy),i));
   const tier=new Array(mods.length).fill(-1);
   const order=mods.map((m,i)=>i).sort((a,b)=>(mods[a].cx*mods[a].f[0]+mods[a].cy*mods[a].f[1])-(mods[b].cx*mods[b].f[0]+mods[b].cy*mods[b].f[1])).reverse();
@@ -1052,7 +1065,7 @@ function build3D(r,Lay){
   // 카메라: 남동쪽 위에서
   const allX=mods.length?mods.map(m=>m.cx):[0],allY=mods.length?mods.map(m=>m.cy):[0];
   const cx=(Math.min(...allX)+Math.max(...allX))/2,cy=(Math.min(...allY)+Math.max(...allY))/2,span=Math.max(60,Math.max(...allX)-Math.min(...allX),Math.max(...allY)-Math.min(...allY));
-  const target=toV(cx,cy,roofs.length?roofs[0].h:5);let az=-0.6,el=0.55,dist=span*1.6;
+  const target=toV(cx,cy,r.mode==='ground'?1:(roofs.length?roofs[0].h:5));let az=-0.6,el=0.55,dist=span*1.6;
   const place=()=>{cam.position.set(target.x+dist*Math.cos(el)*Math.sin(az),target.y+dist*Math.sin(el),target.z+dist*Math.cos(el)*Math.cos(az));cam.lookAt(target);ren.render(scene,cam)};
   place();
   const el0=ren.domElement;let drag=null;el0.style.touchAction='none';el0.style.cursor='grab';
@@ -1066,7 +1079,7 @@ function build3D(r,Lay){
 }
 
 /* ===== 계산 ===== */
-function capacity(r){if(r.mode==='roof'){const L=roofLayout(r);return{area:r.roofArea||0,kw:L.kw,roof:true,modules:L.count}}const area=r.parcel.manual?(CFG.area||3300):Math.max(r.parcel.area-(r.roofArea||0),0);const kw=Math.floor(area/(CFG.pyeongPerKw*PY));return{area,kw}}
+function capacity(r){if(r.mode==='roof'){const L=roofLayout(r);return{area:r.roofArea||0,kw:L.kw,roof:true,modules:L.count}}const area=r.parcel.manual?(CFG.area||3300):Math.max(r.parcel.area-(r.roofArea||0),0);if(r.parcel.geo&&!r.nearPending){const L=roofLayout(r);return{area,kw:L.kw,modules:L.count}}const kw=Math.floor(area/(CFG.pyeongPerKw*PY));return{area,kw}}
 function recWeight(kw,jm,roof){if(roof)return kw<=0?1.5:(Math.min(kw,3000)*1.5+Math.max(0,kw-3000)*1.0)/kw;if(jm==='임')return .5;if(kw<=0)return 1.2;return(Math.min(kw,100)*1.2+Math.max(0,Math.min(kw,3000)-100)*1.0+Math.max(0,kw-3000)*.8)/kw}
 function finance(r){
   const {area,kw,roof}=capacity(r);let hours=CFG.hoursManual>0?CFG.hoursManual:r.sun.hours;
@@ -1093,7 +1106,7 @@ function render1(){setTimeout(()=>{bindMode();const b=$('#btn3d1');if(b)b.onclic
   const lamp=['bad','warn','ok'].map(c=>`<i class="${c===o?'on':''}"></i>`).join('');
   $('#r1').innerHTML=headHTML(r)+modeHTML(r)+`<div class="verdict ${o}"><div class="lamp">${lamp}</div><h3>${{ok:'설치 가능성 높음',warn:'조건부 가능·협의 필요',bad:'설치 어려움',unk:'판정 보류'}[o]}</h3><p>${msg}</p></div>`+itemsHTML(r.judge.items)+
   `<div class="big"><div><b class="num">${R.nearPending&&R.mode==='roof'?'…':nf(f.kw)+'kW'}</b><span>${R.mode==='roof'?'지붕 설치 용량(추정)':'설치 가능 용량(추정)'}</span></div><div><b class="num">${won(f.rev1)}</b><span>첫해 매출</span></div><div><b class="num">${f.payback?nf(f.payback,1)+'년':'–'}</b><span>투자 회수</span></div></div>`+
-  (r.mode==='roof'&&!r.nearPending&&(r.roofs||[]).length?`<button class="btn sun" id="btn3d1" style="width:100%;margin:0 0 10px">🧊 태양광 배치 3D로 보기</button>`:'')+`<p class="hint">${r.mode==='roof'?`건물 지붕형: ${esc(curMod().label)} ${nf(roofLayout(r).count)}장을 지붕에 자동 배치한 ${roofLayout(r).source==='engine'?'결과(설계 계산기 엔진)':'간이 추정'}입니다(여유폭 ${CFG.setback}m, ${CFG.arrMode==='flush'?'지붕 평행 설치':'경사가대 '+CFG.tilt+'°'}). 지붕 경사·설비·그늘은 반영하지 않았습니다. `:`토지 지상형: 필지 면적${r.roofArea?`에서 건물 ${nf(r.roofArea)}㎡를 뺀 ${nf(capacity(r).area)}㎡`:''} 기준입니다. 도로·주차장이 있으면 실제 용량은 더 줄어듭니다. `}이 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 주택 위치는 ${esc(r.near?r.near.src:'–')} 자료 기준이며 누락될 수 있습니다.</p>`;
+  ((r.mode==='roof'&&(r.roofs||[]).length||r.mode==='ground'&&r.parcel.geo)&&!r.nearPending?`<button class="btn sun" id="btn3d1" style="width:100%;margin:0 0 10px">🧊 태양광 배치 3D로 보기</button>`:'')+`<p class="hint">${r.mode==='roof'?`건물 지붕형: ${esc(curMod().label)} ${nf(roofLayout(r).count)}장을 지붕에 자동 배치한 ${roofLayout(r).source==='engine'?'결과(설계 계산기 엔진)':'간이 추정'}입니다(여유폭 ${CFG.setback}m, ${CFG.arrMode==='flush'?'지붕 평행 설치':'경사가대 '+CFG.tilt+'°'}). 지붕 경사·설비·그늘은 반영하지 않았습니다. `:(r.parcel.geo&&!r.nearPending?`토지 지상형: ${esc(curMod().label)} ${nf(roofLayout(r).count)}장을 필지${(r.parcels||[]).length>1?' '+r.parcels.length+'개':''}에 자동 배치한 ${roofLayout(r).source==='engine'?'결과(설계 계산기 엔진)':'간이 추정'}입니다(건물 자리 제외, 경계 여유폭 ${CFG.setback}m, 경사가대 ${CFG.tilt}°). 진입로·울타리·배수로 자리는 반영하지 않았습니다. `:`토지 지상형: 필지 면적${r.roofArea?`에서 건물 ${nf(r.roofArea)}㎡를 뺀 ${nf(capacity(r).area)}㎡`:''} 기준입니다. 도로·주차장이 있으면 실제 용량은 더 줄어듭니다. `)}이 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 주택 위치는 ${esc(r.near?r.near.src:'–')} 자료 기준이며 누락될 수 있습니다.</p>`;
 }
 function render2(){
   const r=R,o=r.ord,a=r.applied,n=r.near,t=r.terrain,z=r.zone;
@@ -1122,6 +1135,7 @@ function render2(){
      <p class="hint">${g.level!=='지번'?`지번으로는 조회되지 않아 <b>${g.level} 단위</b> 선로 전체를 보여줍니다. `:''}단위 kW. 선로(DL) 한도 12,000kW·변압기 한도 50,000kW 기준으로 한전이 계산한 여유입니다. 누적 연계용량: ${g.items.slice(0,3).map(x=>`${esc(x.sub||'')} ${nf(x.subCum)} / ${esc(x.dl||'')} ${nf(x.dlCum)}`).join(', ')}. 조회 주소: ${esc(Object.values(g.query).join(' '))}</p>`;
    else h+=`<p class="hint">${r.gridPending?'조회 중입니다.':r.grid?'이 주소로 조회된 선로 정보가 없습니다.':esc((r.err&&r.err.grid)||'한전 연결이 설정되지 않았습니다.')}${sa?` 공급 변전소(2024.5 자료): <b>${esc(sa.join(', '))}</b>`:''}</p>`;
    h+=`<p class="hint"><a href="https://online.kepco.co.kr/" target="_blank" rel="noopener">한전ON</a>에서 최신 접속 가능 여부를 확인하세요.</p>`}
+  if((r.parcels||[]).length>1)h+=`<h4 class="sec">선택한 필지 ${r.parcels.length}개</h4><dl class="kv">${r.parcels.map((p,i)=>`<dt>${i+1}. ${esc(p.jibunNo)} ${esc(p.jimok||'')}</dt><dd>${nf(p.area)}㎡</dd>`).join('')}<dt>합계</dt><dd>${nf(r.parcel.area)}㎡ (${nf(r.parcel.area/PY)}평)</dd></dl><p class="hint">용도지역·농업진흥·계통은 첫 번째 필지 기준입니다. 필지마다 다를 수 있으니 각각 눌러 확인하세요.</p>`;
   h+=`<h4 class="sec">토지·용도</h4><dl class="kv"><dt>지목</dt><dd>${esc(r.parcel.jimok||'–')}</dd><dt>용도지역</dt><dd>${z?esc(z.names.join(', ')||'미확인'):'–'}</dd><dt>농업진흥구역</dt><dd>${z?(z.jinheung?'해당':'아님'):'–'}</dd><dt>농업보호구역</dt><dd>${z?(z.boho?'해당':'아님'):'–'}</dd><dt>개발제한구역</dt><dd>${z?(z.gb?'해당':'아님'):'–'}</dd><dt>공시지가</dt><dd>${r.parcel.jiga?nf(r.parcel.jiga)+'원/㎡':'–'}</dd></dl>`;
   if(t)h+=`<h4 class="sec">지형</h4><dl class="kv"><dt>평균 경사</dt><dd>${t.slope.toFixed(1)}°</dd><dt>사면향</dt><dd>${t.flat?'평지':aspName(t.aspect)+` (${Math.round(t.aspect)}°)`}</dd><dt>표고</dt><dd>${nf(t.min)}~${nf(t.max)}m</dd></dl>`;
   if(DEBUG)h+=`<h4 class="sec">진단 정보 (debug)</h4><pre style="white-space:pre-wrap;font-size:11px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:320px;overflow:auto">${esc(JSON.stringify({vkey:CFG.vkey?'있음':'없음',domain:CFG.vdomain,time:r.time||null,err:r.err||null,debug:r.debug||null,parcel:r.parcel&&{addr:r.parcel.addr,jimok:r.parcel.jimok,area:r.parcel.area},zone:r.zone,near:r.near&&{total:r.near.total,houses:r.near.houses.length,src:r.near.src}},null,1))}</pre>`;
@@ -1131,14 +1145,14 @@ function render3(){
   const r=R,f=finance(r);
   let h=headHTML(r)+`<div class="big"><div><b class="num">${nf(f.kw)}kW</b><span>설치 가능 용량</span></div><div><b class="num">${nf(f.hours,2)}h</b><span>일평균 발전시간</span></div><div><b class="num">${nf(f.gen1/1000)}MWh</b><span>연간 발전량(1년차)</span></div></div>`;
   h+=modeHTML(r);
-  if(r.mode==='roof'){const L=roofLayout(r);
-   h+=`<div class="big"><div><b class="num">${nf(L.count)}장</b><span>${esc(L.mod.label)}</span></div><div><b class="num">${nf(L.kw,1)}kW</b><span>설치 용량(DC)</span></div><div><b class="num">${L.flush?'평행':CFG.tilt+'°'}</b><span>${L.flush?'지붕 평행 설치':'경사가대'}</span></div></div>
+  if(r.mode==='roof'||(r.parcel.geo&&!r.nearPending)){const L=roofLayout(r);const gr=r.mode==='ground';
+   h+=`<div class="big"><div><b class="num">${nf(L.count)}장</b><span>${esc(L.mod.label)}</span></div><div><b class="num">${nf(L.kw,1)}kW</b><span>설치 용량(DC)</span></div><div><b class="num">${L.flush?'평행':CFG.tilt+'°'}</b><span>${L.flush?'지붕 평행 설치':gr?'지상 경사가대':'경사가대'}</span></div></div>
    <div class="field"><label for="inMod">모듈</label><select id="inMod">${Object.entries(MODS).map(([k,m])=>`<option value="${k}"${k===CFG.module?' selected':''}>${m.label}</option>`).join('')}</select></div>
-   <div class="field"><label for="inArr">설치 방식</label><select id="inArr"><option value="rack"${CFG.arrMode==='rack'?' selected':''}>경사가대(평슬라브 기준)</option><option value="flush"${CFG.arrMode==='flush'?' selected':''}>지붕 평행 설치</option></select></div>
+   ${gr?'':`<div class="field"><label for="inArr">설치 방식</label><select id="inArr"><option value="rack"${CFG.arrMode==='rack'?' selected':''}>경사가대(평슬라브 기준)</option><option value="flush"${CFG.arrMode==='flush'?' selected':''}>지붕 평행 설치</option></select></div>`}
    <div class="field"><label for="inOri">모듈 방향</label><select id="inOri"><option value="portrait"${CFG.orient==='portrait'?' selected':''}>세로형</option><option value="landscape"${CFG.orient==='landscape'?' selected':''}>가로형</option></select></div>
-   ${CFG.arrMode==='rack'?`<div class="field"><label for="inTilt2">설치 경사각(°)</label><input id="inTilt2" type="number" step="1" value="${CFG.tilt}"></div><div class="field"><label for="inShade">음영각(°)</label><input id="inShade" type="number" step="1" value="${CFG.shade}"></div>`:''}
-   <div class="field"><label for="inSetback">가장자리 여유폭(m)</label><input id="inSetback" type="number" step="0.1" value="${CFG.setback}"></div>
-   <dl class="kv"><dt>필지 안 건물</dt><dd>${nf((r.roofs||[]).length)}동 · 바닥 ${nf(r.roofArea||0)}㎡</dd>${(r.roofs||[]).slice(0,6).map(b=>`<dt>${esc(b.name||'이름 없는 건물')}</dt><dd>${nf(b.area)}㎡</dd>`).join('')}</dl>
+   ${(CFG.arrMode==='rack'||gr)?`<div class="field"><label for="inTilt2">설치 경사각(°)</label><input id="inTilt2" type="number" step="1" value="${CFG.tilt}"></div><div class="field"><label for="inShade">음영각(°)</label><input id="inShade" type="number" step="1" value="${CFG.shade}"></div>`:''}
+   <div class="field"><label for="inSetback">${gr?'필지 경계 여유폭(m)':'가장자리 여유폭(m)'}</label><input id="inSetback" type="number" step="0.1" value="${CFG.setback}"></div>
+   <dl class="kv">${gr?`<dt>배치 대상</dt><dd>필지 ${nf(r.parcel.area)}㎡${(r.parcels||[]).length>1?' ('+r.parcels.length+'필지)':''}${r.roofArea?' − 건물 '+nf(r.roofArea)+'㎡':''}</dd>`:''}<dt>필지 안 건물</dt><dd>${nf((r.roofs||[]).length)}동 · 바닥 ${nf(r.roofArea||0)}㎡</dd>${(r.roofs||[]).slice(0,6).map(b=>`<dt>${esc(b.name||'이름 없는 건물')}</dt><dd>${nf(b.area)}㎡</dd>`).join('')}</dl>
    <p class="hint" style="color:${L.source==='engine'?'var(--ok)':'var(--warn)'};font-weight:600">${L.source==='engine'?'✔ 지붕 어레이 설계 계산기('+esc(L.version||'')+')와 같은 엔진으로 계산한 결과입니다.':L.source==='approx-pending'?'⏳ 간이 추정값입니다. 정밀 배치 엔진 결과를 계산하는 중…':'간이 추정값입니다. 정밀 배치 엔진을 불러오지 못했습니다'+(R._engErr?' ('+esc(R._engErr)+')':'')+'.'}</p>
    <p class="hint">건물 윤곽에서 여유폭을 띄우고, 지붕선에 맞춰 남쪽 끝부터 모듈을 깔아 장수를 셉니다. 경사가대는 이격거리 = 프레임 깊이 + 프레임 높이 ÷ tan(음영각)으로 계산하고 뒷다리 5m 안에서 적층 단수를 고릅니다(계산기 v123과 같은 원칙). 용마루·지붕 경사·환기구·채광창은 반영하지 않으므로 최종 설계는 지붕 어레이 설계 계산기에서 확정하세요.</p>
    <button class="btn sun" id="btn3d" style="width:100%;margin:4px 0 12px">🧊 3D로 보기</button>
@@ -1229,7 +1243,7 @@ function toolFinish(){
   if(tool==='draw'&&tpts.length>=3){const ring=[...tpts.map(p=>[p.lng,p.lat]),[tpts[0].lng,tpts[0].lat]];const g={type:'Polygon',coordinates:[ring]};const c=turf.centroid(g).geometry.coordinates;setTool('draw');analyze(L.latLng(c[1],c[0]),g);return}
   tool=null;$$('.tool').forEach(b=>b.setAttribute('aria-pressed',false));map.doubleClickZoom.enable();map.getContainer().style.cursor='';
 }
-map.on('click',e=>{if(tool){tpts.push(e.latlng);toolUpdate();return}analyze(e.latlng)});
+map.on('click',e=>{if(tool){tpts.push(e.latlng);toolUpdate();return}if(typeof MULTI!=='undefined'&&MULTI.on){multiToggleAt(e.latlng);return}analyze(e.latlng)});
 map.on('dblclick',e=>{if(tool){L.DomEvent.stop(e);toolFinish()}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&tool){if(tool==='draw'&&tpts.length>=3)toolFinish();else{setTool(tool);}}});
 
@@ -1374,6 +1388,30 @@ $('#btnAdminLogout').onclick=()=>{localStorage.removeItem('sms.adminToken');ADMI
 (async()=>{const t=localStorage.getItem('sms.adminToken');
   if(t){try{const r=await fetch(workerBase()+'/verify?t='+encodeURIComponent(t),{cache:'no-store'});const d=await r.json();ADMIN=!!d.ok;if(!ADMIN)localStorage.removeItem('sms.adminToken')}catch(e){ADMIN=Number(t.split('.')[0])>Date.now()}}
   adminUI();if(!leadDone()){prefillGate();$('#dlgAgree').showModal()}})();
+
+/* ===== 여러 필지 선택 (지상형) ===== */
+const MULTI={on:false,list:[],layer:L.layerGroup().addTo(map)};
+function multiDraw(){MULTI.layer.clearLayers();MULTI.list.forEach((p,i)=>L.geoJSON(p.geo,{style:{color:'#F2A900',weight:3,dashArray:'4 4',fillColor:'#F2A900',fillOpacity:.12}}).bindTooltip(`${i+1}. ${esc(p.jibunNo||'')} ${esc(p.jimok||'')} · ${nf(p.area)}㎡`,{permanent:MULTI.list.length<=12,direction:'center',className:'lbl'}).addTo(MULTI.layer));
+  $('#hintbar').style.display='block';$('#hintbar').innerHTML=MULTI.on?`🧩 <b>여러 필지 선택</b> · 필지를 누르면 추가, 다시 누르면 빠집니다 (${MULTI.list.length}필지 선택됨)`:'🖱 지도에서 <b>분석할 필지를 클릭</b>하세요';
+  const b=$('#btnMulti');b.setAttribute('aria-pressed',MULTI.on);b.textContent=MULTI.on?`🧩 여러 필지 ${MULTI.list.length}개 · 끝내기`:'🧩 여러 필지'}
+async function multiToggleAt(ll){
+  if(!CFG.vkey){toast('여러 필지 선택은 브이월드 키가 있어야 합니다.');return}
+  let fs;try{fs=await vwData('LP_PA_CBND_BUBUN',`POINT(${ll.lng} ${ll.lat})`,5)}catch(e){toast('필지를 불러오지 못했습니다: '+e.message);return}
+  if(!fs.length){toast('필지가 없습니다.');return}
+  const f=fs[0],p=f.properties||{},jb=String(p.jibun||''),jm=jb.trim().split(/\s+/).pop();
+  const i=MULTI.list.findIndex(x=>x.pnu===p.pnu);
+  if(i>=0)MULTI.list.splice(i,1);else MULTI.list.push({pnu:p.pnu,geo:f.geometry,addr:p.addr||'',jibun:jb,jibunNo:jb.trim().split(/\s+/).slice(0,-1).join(' ')||jb,jimokCode:jm,jimok:JIMOK[jm]||jm,jiga:p.jiga?+p.jiga:null,area:turf.area(f.geometry),ll:[ll.lat,ll.lng]});
+  multiDraw();
+  if(!MULTI.list.length)return;
+  let u=turf.feature(MULTI.list[0].geo);for(const x of MULTI.list.slice(1)){try{u=turf.union(u,turf.feature(x.geo))||u}catch(e){}}
+  const a=MULTI.list[0];
+  const meta={addr:MULTI.list.length>1?`${a.addr} 외 ${MULTI.list.length-1}필지`:a.addr,pnu:a.pnu,jibun:a.jibun,jibunNo:MULTI.list.map(x=>x.jibunNo).join(', '),jimokCode:a.jimokCode,jimok:[...new Set(MULTI.list.map(x=>x.jimok))].join('·'),jiga:a.jiga,list:MULTI.list.map(x=>({pnu:x.pnu,jibunNo:x.jibunNo,jimok:x.jimok,area:x.area}))};
+  R&&(R.modeUser=null);
+  while(busy)await new Promise(res=>setTimeout(res,200));
+  analyze(L.latLng(a.ll[0],a.ll[1]),u.geometry,meta);
+}
+(function(){const seg=$('#btnLocate').parentElement;const b=document.createElement('button');b.id='btnMulti';b.setAttribute('aria-pressed','false');b.textContent='🧩 여러 필지';b.title='지상형: 여러 필지를 합쳐서 분석';seg.insertBefore(b,$('#btnLocate'));
+  b.onclick=()=>{MULTI.on=!MULTI.on;if(!MULTI.on){MULTI.list=[];MULTI.layer.clearLayers()}else toast('필지를 차례로 누르세요. 누를 때마다 합쳐서 다시 분석합니다.');multiDraw()};})();
 
 </script>
 </body>
