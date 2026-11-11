@@ -741,14 +741,12 @@ function appliedBase(o){
 /* 이격 저촉 판정: 가까운 순서로 k번째 주택까지의 거리 d_k가 k호에 해당하는 이격거리 안이면 저촉
    (k ≥ 기준 호수: 조례 거리 / k < 기준 호수: 호당 거리 × k, 호당 기준이 없으면 기준 호수 미만은 미적용) */
 function setbackViolation(ds,A){
-  // 조례 이격 판정 (예: 아산 — 주거 10호↑ 500m, 10호 미만 호당 40m)
-  //  ① 조례 거리(500m) 안 주택이 기준 호수(10호) 이상이면 저촉
-  //  ② 기준 호수 미만이면 그 호수 × 호당 거리(예: 3호 → 120m) 안에 주택이 하나라도 있으면 저촉
-  //  호당 기준이 없는 조례는 ①만 봄
-  if(!A||!(A.house>0))return null;const N=A.count||5;
-  const inR=ds.filter(d=>d<=A.house),n=inR.length;if(!n)return null;
-  if(n>=N)return{type:'count',n,req:A.house};
-  if(A.step){const req=A.step*n,dmin=Math.min(...inR);if(dmin<=req)return{type:'near',n,req,d:dmin}}
+  // 조례 이격 판정 (예: 아산 — 주거 10호↑ 500m, 10호 미만 호당 40m 누적, 최소 200m)
+  //  k호가 그 호수의 이격거리 안에 있으면 저촉: 5호 200m · 6호 240m · 7호 280m · 8호 320m · 9호 360m · 10호 500m
+  //  최소 거리(200m)가 5호 기준이므로 4호 이하는 배치 가능. 호당 기준이 없는 조례는 '조례 거리 안 기준 호수 이상'만 봄
+  if(!A||!(A.house>0))return null;const N=A.count||5,d=ds.slice().sort((x,y)=>x-y);
+  const K0=A.step?Math.max(LEGAL.count||5,Math.ceil((A.minD||0)/A.step)||0,1):N;
+  for(let k=K0;k<=d.length;k++){const req=k>=N?A.house:Math.max(A.minD||0,A.step*k);if(d[k-1]<=req)return{type:k>=N?'count':'near',n:k,req,d:d[k-1]}}
   return null;
 }
 /* 회사 기준: 이격거리는 조례에 적힌 값 그대로(국가 상한 200m로 줄이지 않음). 기준 호수도 조례 값(없으면 5호) */
@@ -758,8 +756,8 @@ function applied(o){
   if(s==='free')return{mode:'free',house:0,count:null,road:0,text:o.p==='none'?'조례 정비 전까지 이격거리를 적용하지 않는다고 답변한 지자체입니다.':'조례에 주거 이격거리 규정이 없습니다.'};
   if(!(o.h>0))return{mode:'assume',house:LEGAL.house,count:o.n||5,road:0,text:`조례에서 주거 이격 수치를 찾지 못해 국가 상한(${LEGAL.house}m)을 가정했습니다. 조례 원문을 확인하세요.`};
   const cnt=o.n||5;
-  return{mode:s==='old'?'old':'ord',house:o.h,count:cnt,step:o.step||0,road:o.r||0,road2:o.r2||0,
-    text:`조례 기준 그대로 적용: ${nf(o.h)}m 안에 주택 ${o.n||5}호 이상이면 불가${o.step?`, ${o.n}호 미만이면 호수 × ${o.step}m 안에 주택이 없어야 함(예: 2호 ${o.step*2}m · 3호 ${o.step*3}m · 4호 ${o.step*4}m)`:''}${o.title?' · '+o.title:''}${o.d?' '+o.d+' 개정':''}.`};
+  return{mode:s==='old'?'old':'ord',house:o.h,count:cnt,step:o.step||0,minD:o.minD||0,road:o.r||0,road2:o.r2||0,
+    text:`조례 기준 그대로 적용: ${nf(o.h)}m 안에 주택 ${o.n||5}호 이상이면 불가${o.step?`, ${o.n}호 미만은 호당 ${o.step}m 누적${o.minD?`(최소 ${o.minD}m)`:''} — 예: ${[5,6,7,8,9].filter(k=>k<(o.n||10)).map(k=>`${k}호 ${Math.max(o.minD||0,o.step*k)}m`).join(' · ')} 안에 그 호수 이상이면 불가`:''}${o.title?' · '+o.title:''}${o.d?' '+o.d+' 개정':''}.`};
 }
 function ordSrcText(o){if(!o)return'';if(o.origin==='user')return'불러온 조례 데이터'+(o.d?` (${esc(o.d)})`:'');if(o.origin==='excel')return`조례 모니터링 엑셀(자치법규정보시스템 원문 정리, ${esc(ORD_META.updated||'')} 갱신) · ${esc(o.title||'')} ${o.d?esc(o.d)+' 개정':''}`;return (o.src||'').split(',').map(s=>ORD_SRC[s]||s).join(' / ')}
 
@@ -1104,7 +1102,7 @@ function judge(r){
     else{
       const vio=setbackViolation(n.houses.map(h=>h.d),a);
       const ref=`부지 경계 ${nf(a.house)}m 안 주택 ${inD.length}동 / 조례 기준 ${a.count}호 이상 ${nf(a.house)}m${a.step?` · ${a.count}호 미만 호당 ${a.step}m`:''}`;
-      if(vio)sb={lv:'bad',v:'저촉',d:(vio.type==='count'?`${ref} → ${nf(vio.req)}m 안 주택이 ${vio.n}호로 기준(${a.count}호) 이상입니다.`:`${ref} → ${nf(a.house)}m 안 주택이 ${vio.n}호라 이격거리가 ${vio.n}×${a.step}=${nf(vio.req)}m인데, 가장 가까운 주택 외벽이 ${nf(vio.d,1)}m입니다.`)+' 여러 필지면 걸리는 필지를 빼고 배치합니다. '+a.text};
+      if(vio)sb={lv:'bad',v:'저촉',d:(vio.type==='count'?`${ref} → ${nf(vio.req)}m 안 주택이 ${vio.n}호로 기준(${a.count}호) 이상입니다.`:`${ref} → ${nf(vio.req)}m 안에 주택이 ${vio.n}호 있어(${vio.n}번째 주택 외벽 ${nf(vio.d,1)}m) ${vio.n}호 기준(${nf(vio.req)}m)에 걸립니다.`)+' 여러 필지면 걸리는 필지를 빼고 배치합니다. '+a.text};
       else sb={lv:'ok',v:'충족',d:`${ref} → 걸리는 주택 없음. 가장 가까운 주택 외벽 ${na!=null?nf(na,1)+'m':'없음'}. `+a.text};
     }
   }
@@ -1139,7 +1137,7 @@ function drawResult(r){
   L.circleMarker(c,{radius:7,color:'#fff',weight:2,fillColor:'#14284B',fillOpacity:1}).bindTooltip('판정지점',{permanent:false}).addTo(judgeLayer);
   const a=r.applied;
   const ring=(m,color,label)=>{if(!m)return;const sg=r.siteGeo||(r.parcel&&r.parcel.geo);const g=sg?turf.buffer(turf.feature(sg),m/1000,{units:'kilometers',steps:24}):turf.circle([r.lon,r.lat],m/1000,{units:'kilometers',steps:64});L.geoJSON(g,{style:{color,weight:2,dashArray:'6 6',fill:false}}).bindTooltip(label,{sticky:true}).addTo(judgeLayer)};
-  if(a.house&&r.mode!=='roof') ring(a.house,'#C8372D',`주거 이격 ${a.house}m`);
+  if(a.house&&r.mode!=='roof') /* 이격 원은 그리지 않음(사용자 요청) */
   if(r.near){
     const D=a.house>0?a.house:0,bs=r.bldNear||[];
     // 기타 건물 외곽선(회색) → 주택 외곽선(빨강=산정 포함, 주황=범위 밖) → 거리선
@@ -1664,7 +1662,7 @@ function renderParcelTable(){
   const tb=$('pTable').querySelector('tbody'); tb.innerHTML='';
   parcels.forEach((p,i)=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i+1}</td><td class="tl" title="${p.addr||''}">${p.jibun}${p.excluded?'<br><b style="color:#C8372D;font-size:11px">이격 제외 · '+(p.viol?(p.viol.type==='count'?p.viol.req+'m 안 주택 '+p.viol.n+'호(기준 이상)':p.viol.n+'호 → '+p.viol.req+'m 안에 주택'):'합친 부지 저촉')+'</b>':p.hcount!=null?'<br><small style="color:#5B6B63">'+(R&&R.applied?R.applied.house+'m 안 ':'')+'주택 '+p.hcount+'호</small>':''}</td><td>${p.jimok||'-'}</td><td>${fmt(p.area)}</td><td><button class="del" title="해제">✕</button></td>`;
+    tr.innerHTML=`<td>${i+1}</td><td class="tl" title="${p.addr||''}">${p.jibun}${p.excluded?'<br><b style="color:#C8372D;font-size:11px">이격 제외 · '+(p.viol?(p.viol.type==='count'?p.viol.req+'m 안 주택 '+p.viol.n+'호(기준 이상)':p.viol.req+'m 안 주택 '+p.viol.n+'호'):'합친 부지 저촉')+'</b>':p.hcount!=null?'<br><small style="color:#5B6B63">'+(R&&R.applied?R.applied.house+'m 안 ':'')+'주택 '+p.hcount+'호</small>':''}</td><td>${p.jimok||'-'}</td><td>${fmt(p.area)}</td><td><button class="del" title="해제">✕</button></td>`;
     if(p.excluded)tr.style.background='#fdecea';p.layer.setStyle&&p.layer.setStyle(p.excluded?{color:'#C8372D',dashArray:'2 4',fillColor:'#C8372D',fillOpacity:.12}:pStyle);
     tr.querySelector('button').onclick=()=>removeParcel(i);
     tb.appendChild(tr);
@@ -2590,7 +2588,8 @@ function siteUnionGeo(all){const ps=all?parcels:keptParcels();if(!ps.length)retu
     if(g.type==='Polygon')return{type:'Polygon',coordinates:[g.coordinates[0]]};
     if(g.type==='MultiPolygon')return{type:'MultiPolygon',coordinates:g.coordinates.map(p=>[p[0]])}}}catch(e){}
   return u.geometry}
-const keptParcels=()=>parcels.filter(p=>!p.excluded);
+let REF_LAYOUT=false;
+const keptParcels=()=>{const k=parcels.filter(p=>!p.excluded);REF_LAYOUT=!k.length&&parcels.length>0;return k.length?k:parcels};
 /* 이 시군 조례의 배치 기준(부지경계 완충폭, 모듈 연속 설치 길이·구간 간격, 모듈 이격) */
 function ordLay(){const o=(typeof R!=='undefined'&&R&&R.ord)||{};return{buf:+o.buf||0,contLen:+o.contLen||0,contGap:+o.contGap||0,modGap:+o.modGap||0}}
 function applyOrdLay(){const O=ordLay(),t=[];
@@ -2620,13 +2619,13 @@ async function recheckSetback(manual){
     if(D>0){parcels.forEach(p=>{const meas=edgeMeasurer(p.feature.geometry||p.feature);p.dist=H.map(h=>meas(h.geo||[h.lon,h.lat]).d);p.hcount=p.dist.filter(x=>x<=D).length;p.viol=setbackViolation(p.dist,A);p.excluded=!!p.viol});
       for(let g=0;g<parcels.length;g++){const k=keptParcels();if(!k.length)break;const um=H.map((h,i)=>Math.min(...k.map(p=>p.dist[i])));if(!setbackViolation(um,A))break;
         k.sort((x,y)=>y.dist.filter(v=>v<=D).length-x.dist.filter(v=>v<=D).length||Math.min(...x.dist)-Math.min(...y.dist))[0].excluded=true}}
-    const kept=keptParcels(),ex=parcels.length-kept.length;unionCache={};
+    const kept=keptParcels(),ex=parcels.filter(p=>p.excluded).length;unionCache={};
     const g=kept.length?siteUnionGeo():null;R.siteGeo=g&&parcels.length>1?g:(kept.length?null:R.siteGeo);
     if(kept.length){R.target=makeTarget(R.lat,R.lon,g);computeNear(R,{...raw})}
     judge(R);drawResult(R);renderAll();renderParcelTable();
     const sb=R.setback||{};
-    msg('sbMsg',`${ex?`이격 저촉으로 ${ex}필지 제외 · `:''}남은 ${kept.length}필지 외곽 기준: 가장 가까운 주택 외벽 ${sb.nearAny!=null?fmt(sb.nearAny,1)+'m':'없음'}${D?` · ${D}m 안 ${(R.near.houses||[]).filter(h=>h.d<=D).length}호`:''}${R.verifyMsg?' · '+R.verifyMsg:''}`,!kept.length);
-    if(kept.length)autoMax();else{clearLayout();LAYOUT=null;$('res').innerHTML='<div class="hint">모든 필지가 이격거리에 걸려 배치할 수 없습니다.</div>'}
+    msg('sbMsg',`${REF_LAYOUT?'⚠ 모든 필지가 조례 이격에 걸립니다. 아래 배치는 참고용 최대 배치입니다(현재 기준으로는 허가가 어려움) · ':ex?`이격 저촉으로 ${ex}필지 제외 · `:''}${REF_LAYOUT?'':`남은 ${kept.length}필지 `}외곽 기준: 가장 가까운 주택 외벽 ${sb.nearAny!=null?fmt(sb.nearAny,1)+'m':'없음'}${D?` · ${D}m 안 ${(R.near.houses||[]).filter(h=>h.d<=D).length}호`:''}${R.verifyMsg?' · '+R.verifyMsg:''}`,REF_LAYOUT);
+    autoMax();
   }catch(e){msg('sbMsg','이격거리를 확인하지 못했습니다: '+e.message,true)}
 }
 /* 최대 배치: 방위(정남 ±10°, 부지 경계선 방향)·설치 방향·단수(뒷다리 5m 안)·테이블 열수를 바꿔 가며 장수가 가장 많은 조합을 찾아 화면에 적용 */

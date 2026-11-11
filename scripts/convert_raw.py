@@ -96,6 +96,8 @@ def convert_ordinances(path):
         if n: it["n"] = n
         ms = re.search(r"(\d+)\s*호\s*미만\s*호당\s*(\d+)\s*m", p["now"] + " " + p["review"])  # 예: 10호 미만 호당 40m 누적
         if ms: it["step"] = int(ms.group(2)); it.setdefault("n", int(ms.group(1)))
+        mm = re.search(r"최소\s*(\d+)\s*m", p["now"] + " " + p["review"])  # 예: 호당 40m 누적(최소 200m)
+        if ms and mm: it["minD"] = int(mm.group(1))
         # 배치 관련 조례 기준: 부지경계 완충폭, 모듈 연속 설치 길이·구간 사이 간격, 모듈(어레이) 이격
         T = p["now"] + " " + p["review"]
         bufs = [float(x) for x in re.findall(r"완충\s*(?:공간|폭)?\s*(\d+(?:\.\d+)?)\s*m", T)]
