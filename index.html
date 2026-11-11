@@ -766,8 +766,9 @@ function deriveHouses(r){
   const V=r.verify||{};
   for(const h of raw.bld){const k=bKey(h.lat,h.lon);seen.add(k);if(HOUSE_OVR[k]===false)continue;
     const v=V[k];if(v&&v.house===false&&HOUSE_OVR[k]!==true)continue; // 건축물대장상 주택 아님
-    const sure=HOUSE_OVR[k]===true||(v&&v.house)||/^(공동주택|단독주택|주택|주택\(건물정보\))$/.test(h.kind);
-    list.push({...h,kind:v&&v.house?'주택(대장: '+v.purpose+')':h.kind,key:k,ovr:HOUSE_OVR[k]===true,sure:!!sure,reg:v||null,weight:v&&v.hhld>1?Math.min(v.hhld,20):(h.kind==='공동주택'?5:1)})}
+    // 건축물대장으로 '주택 아님'이 확인된 건물만 빼고, 대장이 없거나 확인 못 한 건물은 주택으로 보고 셈(안전 쪽)
+    const conf=HOUSE_OVR[k]===true||(v&&v.house)||/^(공동주택|단독주택|주택|주택\(건물정보\))$/.test(h.kind);const sure=true;
+    list.push({...h,unconf:!conf,kind:v&&v.house?'주택(대장: '+v.purpose+')':(conf?h.kind:'주택 추정(대장 미확인)'),key:k,ovr:HOUSE_OVR[k]===true,sure:!!sure,reg:v||null,weight:v&&v.hhld>1?Math.min(v.hhld,20):(h.kind==='공동주택'?5:1)})}
   for(const p of raw.polys||[]){let c;try{c=turf.centroid(turf.feature(p.geo)).geometry.coordinates}catch(e){continue}const k=bKey(c[1],c[0]);if(seen.has(k))continue;seen.add(k);
     if(HOUSE_OVR[k]===true||(V[k]&&V[k].house))list.push({lat:c[1],lon:c[0],kind:HOUSE_OVR[k]===true?'주택(직접 지정)':'주택(건축물대장)',name:p.name||'',geo:p.geo,key:k,ovr:HOUSE_OVR[k]===true,sure:true,reg:V[k]||null,weight:V[k]&&V[k].hhld>1?Math.min(V[k].hhld,20):1})}
   for(const a of HOUSE_ADD){if(turf.distance([r.lon,r.lat],[a.lon,a.lat],{units:'meters'})>raw.Rb+300)continue;list.push({lat:a.lat,lon:a.lon,kind:'주택(직접 추가)',name:'',geo:null,key:'add:'+bKey(a.lat,a.lon),added:true,sure:true,weight:1})}
@@ -882,9 +883,9 @@ async function verifyHouses(r){
       let it=items[0];if(items.length>1&&h.geo){const a=turf.area(turf.feature(h.geo));it=items.slice().sort((x,y)=>Math.abs((x.archArea||0)-a)-Math.abs((y.archArea||0)-a))[0]}
       const isH=isHousePurpose(it.purpose);
       r.verify[h.key]={house:isH,purpose:it.purpose||'용도 미상',hhld:isH?(it.hhld||0):0,pnu,d:h.d,name:it.bldNm||h.name||'',lat:h.lat,lon:h.lon,useAprDay:it.useAprDay||''};isH?yes++:no++;
-    }catch(e){}finally{done++;const el=$('#st-verify');if(el)el.innerHTML=`주변 주택 건축물대장 확인 <small>${done}/${cand.length}</small>`}};
+    }catch(e){r.verifyErr=e.message}finally{done++;const el=$('#st-verify');if(el)el.innerHTML=`주변 주택 건축물대장 확인 <small>${done}/${cand.length}</small>`}};
   const q=cand.slice();await Promise.all(Array.from({length:5},async()=>{while(q.length)await one(q.shift())}));
-  OVR_VER++;return `${cand.length}동 확인: 주택 ${yes} · 주택 아님 ${no} · 대장 없음 ${cand.length-yes-no}`;
+  OVR_VER++;if(!yes&&!no&&r.verifyErr)throw new Error('건축물대장 조회 실패: '+r.verifyErr);return `${cand.length}동 확인: 주택 ${yes} · 주택 아님 ${no} · 대장 없음 ${cand.length-yes-no}`;
 }
 
 let busy=false;
@@ -991,9 +992,10 @@ function judge(r){
       :{lv:'bad',v:'배치 불가',d:`패널 끝에서 ${nf(ringDist(r))}m 안 주택을 5호 미만으로 줄이면 남는 패널이 없습니다. `+(a.text||'')};
   }
   else if(n&&!r.nearPending&&sb.d&&n.ringDist)sb.d+=` ${basisName(r)}에서 ${nf(n.ringDist)}m 선 안에 걸치는 주택 ${nf(n.inRing)}동(지도에 빨간색).`;
-  if(n&&!r.nearPending){const uv=n.houses.filter(h=>h.inRing&&!h.sure).length,vf=Object.keys(r.verify||{}).length;
+  if(n&&!r.nearPending){const uv=n.houses.filter(h=>h.inRing&&h.unconf).length,vf=Object.keys(r.verify||{}).length;
     if(vf)sb.d+=` 주변 건물 ${vf}동은 건축물대장으로 주택 여부를 확인했습니다(공장·창고 등은 주택에서 제외).`;
-    if(uv)sb.d+=` 용도를 확인하지 못한 건물 ${uv}동은 주거밀집 계산에서 뺐습니다. 지도에서 눌러 주택인지 지정하세요.`}
+    if(uv)sb.d+=` 이격선 안 건물 중 ${uv}동은 건축물대장으로 확인하지 못해 주택으로 보고 셌습니다. 주택이 아니면 지도에서 눌러 '주택 아님'으로 바꾸세요.`;
+    if(r.err&&r.err.verify)sb.d+=` ⚠ ${r.err.verify} — 공장·창고도 주택으로 셀 수 있으니 Worker의 DATA_GO_KR_KEY를 확인하세요.`}
   it.push({k:'조례 이격거리',v:sb.v,lv:sb.lv,d:sb.d});
   // 계통
   {const sa=substArea(r);const saTxt=sa?` 이 읍면동의 공급 변전소(한전 2024.5 자료): ${sa.join(', ')}.`:'';
@@ -1028,7 +1030,7 @@ function drawResult(r){
   if(r.near){
     {const hk=new Set(r.near.houses.map(h=>h.key));(r.polys||[]).forEach(p=>{let c;try{c=turf.centroid(turf.feature(p.geo)).geometry.coordinates}catch(e){return}const k=bKey(c[1],c[0]);if(hk.has(k)||(r.roofs||[]).some(b=>b.geo===p.geo))return;
       L.geoJSON(p.geo,{bubblingMouseEvents:false,style:{color:'#6b7a70',weight:1,dashArray:'2 3',fillColor:'#ffffff',fillOpacity:.05}}).bindPopup(()=>bldPopup({key:k,name:p.name,kind:'건물',isHouse:false,ovr:HOUSE_OVR[k]===false,lat:c[1],lon:c[0]}),{maxWidth:220}).addTo(houseLayer)})}
-    r.near.houses.slice(0,1500).forEach(h=>{const tip=`${esc(h.name||h.kind)}${h.name?' ('+h.kind+')':''}${h.reg?' · 대장: '+esc(h.reg.purpose)+(h.reg.hhld?' '+h.reg.hhld+'세대':''):h.sure?'':' · 용도 미확인(주거밀집 계산 제외)'}${h.cluster?' · 주거밀집(5호+)':''} · ${basisName(r)}에서 ${nf(h.d)}m${h.inRing?' · 선 안에 걸침':''}`;
+    r.near.houses.slice(0,1500).forEach(h=>{const tip=`${esc(h.name||h.kind)}${h.name?' ('+h.kind+')':''}${h.reg&&h.reg.house?' · 대장: '+esc(h.reg.purpose)+(h.reg.hhld?' '+h.reg.hhld+'세대':''):h.unconf?' · 대장 미확인(주택으로 간주)':''}${h.cluster?' · 주거밀집(5호+)':''} · ${basisName(r)}에서 ${nf(h.d)}m${h.inRing?' · 선 안에 걸침':''}`;
       const pop=()=>bldPopup({key:h.key,name:h.name,kind:h.kind,isHouse:true,ovr:h.ovr,added:h.added,d:h.d,lat:h.lat,lon:h.lon});
       if(h.geo)L.geoJSON(h.geo,{bubblingMouseEvents:false,style:{color:h.inRing?'#C8372D':'#8a958f',weight:h.inRing?2:1,fillColor:h.inRing?'#ff6b5e':'#c9d0cc',fillOpacity:h.inRing?.55:.25}}).bindTooltip(tip,{sticky:true}).bindPopup(pop,{maxWidth:220}).addTo(houseLayer);
       else L.circleMarker([h.lat,h.lon],{bubblingMouseEvents:false,radius:h.added?7:(h.cluster?5:3.5),color:h.added?'#7a3cc0':(h.inRing?'#C8372D':'#fff'),weight:h.added?2.5:1.5,fillColor:h.inRing?'#ff6b5e':'#8a958f',fillOpacity:.9}).bindTooltip(tip).bindPopup(pop,{maxWidth:220}).addTo(houseLayer)});
