@@ -969,8 +969,8 @@ function computeNear(r,raw){
   // 고시 제5조: 이격거리 범위 안에 주택 경계(외벽) 일부가 포함되면 1호, 단독·공동주택 모두 1동=1호
   const bkeys=new Set(raw.bld.map(h=>bKey(h.lat,h.lon)));
   const extra=(raw.polys||[]).map(p=>{const k=geoKey(p.geo);if(HOUSE_OVR[k]!==true||bkeys.has(k))return null;const c=k.split(',').map(Number);return{lat:c[0],lon:c[1],kind:'주택(직접 지정)',name:p.name||'',geo:p.geo}}).filter(Boolean);
-  let houses=[...raw.bld,...extra].filter(h=>{const k=bKey(h.lat,h.lon);return houseCounted(k,r.verify&&r.verify[k])}).map(h=>{const m=meas(h.geo||[h.lon,h.lat]);const v=r.verify&&r.verify[bKey(h.lat,h.lon)];if(v&&v.house)h={...h,kind:'주택(대장: '+v.purpose+')'};return {...h,d:m.d,pa:m.a,pb:m.b,edge:!!h.geo}}).filter(h=>h.d<=raw.Rb).sort((x,y)=>x.d-y.d).slice(0,1500);
-  for(const h of houses)h.cluster=D>0&&h.d<=D;
+  let houses=[...raw.bld,...extra].filter(h=>HOUSE_OVR[bKey(h.lat,h.lon)]!=='hide').map(h=>{const m=meas(h.geo||[h.lon,h.lat]);const v=r.verify&&r.verify[bKey(h.lat,h.lon)];if(v&&v.house)h={...h,kind:'주택(대장: '+v.purpose+')'};return {...h,d:m.d,pa:m.a,pb:m.b,edge:!!h.geo,counted:houseCounted(bKey(h.lat,h.lon))}}).filter(h=>h.d<=raw.Rb).sort((x,y)=>x.d-y.d).slice(0,1500);
+  for(const h of houses)h.cluster=D>0&&h.counted&&h.d<=D;
   r.unreg=(raw.unreg||[]).map(b=>{const m=meas(b.geo||[b.lon,b.lat]);return{...b,d:m.d,pa:m.a,pb:m.b,inD:D>0&&m.d<=D}}).filter(b=>b.d<=raw.Rb).sort((x,y)=>x.d-y.d);
   r.bldNear=(raw.polys||[]).map(b=>{const m=meas(b.geo);return{name:b.name,kind:b.kind||'건물',geo:b.geo,d:m.d,pa:m.a,pb:m.b}}).filter(b=>b.d<=Math.max(D,200)+100).sort((x,y)=>x.d-y.d).slice(0,400);
   const roads=raw.roads.map(({t,geom})=>{const line=turf.lineString(geom.map(g=>[g.lon,g.lat]));let m=1e9;for(const v of tg.verts)m=Math.min(m,turf.pointToLineDistance(turf.point(v),line,{units:'meters'}));if(tg.f)for(const g of geom)m=Math.min(m,tg.dist(g.lon,g.lat));const cls=/^(motorway|trunk|primary)/.test(t.highway)?'고속·국도급':'지방도·군도급';return{name:t.name||(t.ref?t.ref+'번 도로':cls),cls,d:m}}).sort((x,y)=>x.d-y.d);
@@ -1094,13 +1094,13 @@ function judge(r){
   // 이격
   const a=r.applied,n=r.near;let sb=r.nearPending?{lv:'unk',v:'확인 중…',d:'주변 주택을 조회하고 있습니다. 몇 초 안에 자동으로 갱신됩니다.'}:{lv:'unk',v:'판정 못 함',d:'주변 건물 자료를 불러오지 못해 주택 거리를 확인하지 못했습니다. 위성사진으로 주변 주택을 직접 확인하세요. '+a.text};
   if(n){
-    const na=n.houses.length?n.houses[0].d:null,inD=a.house>0?n.houses.filter(h=>h.d<=a.house):[];
+    const HC=n.houses.filter(h=>h.counted),na=HC.length?HC[0].d:null,inD=a.house>0?HC.filter(h=>h.d<=a.house):[];
     r.setback={nearAny:na,nearCluster:null,count:inD.length,D:a.house,N:a.count};
     if(n.total===0&&a.mode!=='free'&&a.mode!=='invalid') sb={lv:'warn',v:'건물 자료 없음',d:`반경 ${nf(n.Rb)}m 안에 등록된 건물 자료가 하나도 없습니다. 위성사진으로 주택을 확인하세요. `+a.text};
     else if(a.mode==='free') sb={lv:'ok',v:'규제 미적용',d:a.text};
     else if(a.mode==='invalid') sb={lv:r.ord&&r.ord.p==='old'?'warn':'ok',v:'조례 미정비·적용 불가',d:a.text+(na!=null?` (참고: 가장 가까운 주택 외벽 ${nf(na)}m)`:'')};
     else{
-      const vio=setbackViolation(n.houses.map(h=>h.d),a);
+      const vio=setbackViolation(HC.map(h=>h.d),a);
       const ref=`부지 경계 ${nf(a.house)}m 안 주택 ${inD.length}동 / 조례 기준 ${a.count}호 이상 ${nf(a.house)}m${a.step?` · ${a.count}호 미만 호당 ${a.step}m`:''}`;
       if(vio)sb={lv:'bad',v:'저촉',d:(vio.type==='count'?`${ref} → ${nf(vio.req)}m 안 주택이 ${vio.n}호로 기준(${a.count}호) 이상입니다.`:`${ref} → ${nf(vio.req)}m 안에 주택이 ${vio.n}호 있어(${vio.n}번째 주택 외벽 ${nf(vio.d,1)}m) ${vio.n}호 기준(${nf(vio.req)}m)에 걸립니다.`)+' 여러 필지면 걸리는 필지를 빼고 배치합니다. '+a.text};
       else sb={lv:'ok',v:'충족',d:`${ref} → 걸리는 주택 없음. 가장 가까운 주택 외벽 ${na!=null?nf(na,1)+'m':'없음'}. `+a.text};
@@ -1222,8 +1222,8 @@ function render2(){
    else h+=`<p class="hint">${r.gridPending?'조회 중입니다.':r.grid?'이 주소로 조회된 선로 정보가 없습니다.':esc((r.err&&r.err.grid)||'한전 연결이 설정되지 않았습니다.')}${sa?` 공급 변전소(2024.5 자료): <b>${esc(sa.join(', '))}</b>`:''}</p>`;
    h+=`<p class="hint"><a href="https://online.kepco.co.kr/" target="_blank" rel="noopener">한전ON</a>에서 최신 접속 가능 여부를 확인하세요.</p>`}
   {const D=r.applied&&r.applied.house>0?r.applied.house:200,raw=r.nearRaw||{},bset=new Map((raw.bld||[]).map(h=>[bKey(h.lat,h.lon),h])),seen=new Set(),rows=[];
-   const add=(k,o)=>{if(!k||seen.has(k))return;seen.add(k);const v=(r.verify||{})[k],cand=bset.has(k)||HOUSE_OVR[k]===true;
-     rows.push({k,d:o.d,lat:o.lat,lon:o.lon,name:o.name||'',vw:o.kind||'',v,cand,counted:cand&&houseCounted(k,v),hidden:HOUSE_OVR[k]==='hide',unreg:!!o.unreg})};
+   const add=(k,o)=>{if(!k||seen.has(k))return;seen.add(k);const v=(r.verify||{})[k],cand=true;
+     rows.push({k,d:o.d,lat:o.lat,lon:o.lon,name:o.name||'',vw:o.kind||'',v,cand,counted:houseCounted(k,v),hidden:HOUSE_OVR[k]==='hide',unreg:!!o.unreg})};
    (r.bldNear||[]).forEach(b=>{const k=geoKey(b.geo);const c=k?k.split(',').map(Number):[0,0];add(k,{...b,lat:c[0],lon:c[1]})});
    (r.near&&r.near.houses||[]).forEach(h=>add(bKey(h.lat,h.lon),h));
    (r.unreg||[]).forEach(u=>{const c=u.geo?geoKey(u.geo):bKey(u.lat,u.lon);const xy=c.split(',').map(Number);add(c,{...u,lat:xy[0],lon:xy[1],kind:'대장 미등재 추정',unreg:true})});
@@ -1233,10 +1233,10 @@ function render2(){
    const kindTxt=x=>x.v?`대장: ${esc(x.v.purpose)}${x.v.hhld?' '+x.v.hhld+'세대':''}`:x.unreg?'대장 미등재 추정':esc(x.vw||'건물');
    const inD=rows.filter(x=>x.d<=D),bd={h:inD.filter(x=>x.v&&x.v.house===true).length,nh:inD.filter(x=>x.v&&x.v.house===false).length,nr:inD.filter(x=>x.cand&&(!x.v||x.v.house===null)).length,man:inD.filter(x=>HOUSE_OVR[x.k]!==undefined).length};
    h+=`<h4 class="sec">주변 건물 건축물대장 확인 (부지 경계 ${nf(D)}m 안)</h4>
-   <p class="hint" style="margin:0 0 6px">${nf(D)}m 안 건물 ${inD.length}동 → <b>호수 산정 ${nCnt}호</b><br>대장 주택 ${bd.h} · 대장 주택 아님 ${bd.nh} · 대장 없음(주택으로 셈) ${bd.nr}${bd.man?` · <b>직접 지정 ${bd.man}동</b> <button class="linkbtn" id="ovrReset">직접 지정 모두 초기화</button>`:''}${nHid?` · 지운 건물 ${nHid}동 <button class="linkbtn" id="bldHid">${showHidden?'지운 건물 숨기기':'지운 건물 보기'}</button>`:''}${r.verifyErr?`<br><b style="color:var(--bad)">⚠ 건축물대장 조회 오류: ${esc(r.verifyErr)}</b>`:''}</p>
-   <div class="tblwrap"><table style="width:100%;font-size:12px;border-collapse:collapse;background:#fff;border:1px solid var(--line)"><thead><tr><th>거리</th><th>건물</th><th>호수 산정</th><th>관리</th><th></th></tr></thead><tbody>${cur.map(x=>{const o=HOUSE_OVR[x.k];return `<tr style="${x.d<=D?'':'color:#8a958f'}${x.counted?'':';background:#f6f7f6'}"><td class="num">${nf(x.d,1)}m${x.d<=D?' ●':''}</td><td>${kindTxt(x)}${x.name?'<br><small>'+esc(x.name)+'</small>':''}</td><td>${x.counted?'<b style="color:var(--bad)">포함</b>':x.hidden?'<s>지움</s>':'제외'}${o!==undefined?'<br><small>직접 지정</small>':''}</td><td>${x.hidden?`<button class="linkbtn" data-ovr="${x.k}" data-val="r">되살리기</button>`:x.counted?`<button class="linkbtn" data-ovr="${x.k}" data-val="0">제외하기</button>`:`<button class="linkbtn" data-ovr="${x.k}" data-val="1">주택으로 포함</button>`}${x.hidden?'':` <button class="linkbtn" data-ovr="${x.k}" data-val="h">지우기</button>`}${o!==undefined&&!x.hidden?` <button class="linkbtn" data-ovr="${x.k}" data-val="r">자동</button>`:''}</td><td><button class="linkbtn" data-goto="${x.lat},${x.lon}">지도</button></td></tr>`}).join('')||'<tr><td colspan="5" class="hint">주변 건물이 없습니다.</td></tr>'}</tbody></table></div>
+   <p class="hint" style="margin:0 0 6px">${nf(D)}m 안 건물 ${inD.length}동 → <b>호수 산정 ${nCnt}호</b><br>기본은 모두 빠져 있고, <b>주택으로 포함</b>한 건물만 셉니다. (참고: 대장상 주택 ${bd.h}동 · 주택 아님 ${bd.nh}동 · 대장 없음 ${bd.nr}동)<br><button class="linkbtn" id="incReg">대장상 주택 모두 포함</button> · <button class="linkbtn" id="ovrReset">모두 빼기(초기화)</button>${nHid?` · 지운 건물 ${nHid}동 <button class="linkbtn" id="bldHid">${showHidden?'지운 건물 숨기기':'지운 건물 보기'}</button>`:''}${r.verifyErr?`<br><b style="color:var(--bad)">⚠ 건축물대장 조회 오류: ${esc(r.verifyErr)}</b>`:''}</p>
+   <div class="tblwrap"><table style="width:100%;font-size:12px;border-collapse:collapse;background:#fff;border:1px solid var(--line)"><thead><tr><th>거리</th><th>건물</th><th>호수 산정</th><th>관리</th><th></th></tr></thead><tbody>${cur.map(x=>{const o=HOUSE_OVR[x.k];return `<tr style="${x.d<=D?'':'color:#8a958f'}${x.counted?'':';background:#f6f7f6'}"><td class="num">${nf(x.d,1)}m${x.d<=D?' ●':''}</td><td>${kindTxt(x)}${x.name?'<br><small>'+esc(x.name)+'</small>':''}</td><td>${x.counted?'<b style="color:var(--bad)">포함</b>':x.hidden?'<s>지움</s>':'–'}</td><td>${x.hidden?`<button class="linkbtn" data-ovr="${x.k}" data-val="r">되살리기</button>`:x.counted?`<button class="linkbtn" data-ovr="${x.k}" data-val="r">빼기</button>`:`<button class="linkbtn" data-ovr="${x.k}" data-val="1">주택으로 포함</button>`}${x.hidden||x.counted?'':` <button class="linkbtn" data-ovr="${x.k}" data-val="h">지우기</button>`}</td><td><button class="linkbtn" data-goto="${x.lat},${x.lon}">지도</button></td></tr>`}).join('')||'<tr><td colspan="5" class="hint">주변 건물이 없습니다.</td></tr>'}</tbody></table></div>
    ${pages>1?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin:6px 0">${Array.from({length:pages},(_,i)=>`<button class="btn ${i+1===pg?'':'alt'}" data-bpage="${i+1}" style="padding:3px 10px;font-size:12px">${i+1}</button>`).join('')}</div>`:''}
-   <p class="hint">조례 거리(${nf(D)}m) 안 건물만 보여줍니다. 대장상 주택이 아닌 건물은 자동 제외. <b>제외하기</b> = 이격 호수에서 뺌(빈집·멸실 등), <b>주택으로 포함</b> = 호수에 넣음, <b>지우기</b> = 목록과 계산에서 모두 뺌. 바꾸면 필지 제외·최대 배치를 다시 계산하고, 이 브라우저에 저장됩니다.</p>`}
+   <p class="hint">조례 거리(${nf(D)}m) 안 건물만 보여줍니다. 대장상 주택이 아닌 건물은 자동 제외. <b>주택으로 포함</b> = 이격 호수에 넣음, <b>빼기</b> = 다시 뺌, <b>지우기</b> = 목록에서 숨김. 바꾸면 필지 제외·최대 배치를 다시 계산하고, 이 브라우저에 저장됩니다.</p>`}
   {const B=r.bld||[];h+=`<h4 class="sec" id="bldSec">건축물대장 (국토교통부 표제부)</h4>`;
    if(B.length)h+=`<div class="tblwrap"><table style="width:100%;font-size:12px;border-collapse:collapse;background:#fff;border:1px solid var(--line)"><thead><tr><th>건물</th><th>주용도</th><th>구조/지붕</th><th>층·높이</th><th>건축/연면적</th><th>사용승인</th></tr></thead><tbody>${B.map(x=>`<tr><td>${esc(x.dongNm||x.bldNm||x.mainAtch||'')}</td><td>${esc(x.purpose)}${x.hhld?'<br>'+x.hhld+'세대':''}</td><td>${esc(x.strct)}<br>${esc(x.roof)}</td><td>${x.floors||'-'}층${x.height?'<br>'+x.height+'m':''}</td><td class="num">${nf(x.archArea)}㎡<br>${nf(x.totArea)}㎡</td><td>${esc((x.useAprDay||'').replace(/(\d{4})(\d{2})(\d{2})/,'$1.$2.$3'))}</td></tr>`).join('')}</tbody></table></div>`;
    else h+=`<p class="hint">${r.bldPending?'조회 중입니다.':r.err&&r.err.bld?'조회하지 못했습니다: '+esc(r.err.bld):'이 필지에 등록된 건축물대장이 없습니다.'}</p>`;
@@ -1251,7 +1251,8 @@ function render2(){
    $$('#t2 [data-ovr]').forEach(b=>b.onclick=()=>{const v=b.dataset.val;setHouseOvr(b.dataset.ovr,v==='r'?null:v==='h'?'hide':v==='1');toast(v==='0'?'이격 호수에서 뺐습니다. 다시 계산합니다.':v==='1'?'주택으로 넣었습니다. 다시 계산합니다.':v==='h'?'목록과 계산에서 지웠습니다.':'자동 판정으로 되돌렸습니다.')});
    $$('#t2 [data-bpage]').forEach(b=>b.onclick=()=>{window.BLD_PAGE=+b.dataset.bpage;render2()});
    if($('#bldHid'))$('#bldHid').onclick=()=>{window.BLD_SHOW_HIDDEN=!window.BLD_SHOW_HIDDEN;render2()};
-   if($('#ovrReset'))$('#ovrReset').onclick=()=>{HOUSE_OVR={};try{localStorage.removeItem('sms.houseOvr')}catch(e){}toast('직접 지정을 모두 지웠습니다. 다시 계산합니다.');setHouseOvr('__',null)};
+   if($('#ovrReset'))$('#ovrReset').onclick=()=>{HOUSE_OVR={};try{localStorage.removeItem('sms.houseOvr')}catch(e){}toast('포함한 주택을 모두 뺐습니다. 다시 계산합니다.');setHouseOvr('__',null)};
+   if($('#incReg'))$('#incReg').onclick=()=>{Object.entries(r.verify||{}).forEach(([k,v])=>{if(v.house===true&&HOUSE_OVR[k]!=='hide')HOUSE_OVR[k]=true});toast('대장상 주택을 모두 포함했습니다. 다시 계산합니다.');setHouseOvr('__',null)};
    $$('#t2 [data-goto]').forEach(b=>b.onclick=()=>{const [la,lo]=b.dataset.goto.split(',').map(Number);if(window._hi)map.removeLayer(window._hi);const hh=[...(R.near&&R.near.houses||[]),...(R.bldNear||[])].find(x=>x.geo&&(x.lat!=null?bKey(x.lat,x.lon)===bKey(la,lo):false)||(x.geo&&(()=>{try{const c=turf.centroid(turf.feature(x.geo)).geometry.coordinates;return bKey(c[1],c[0])===bKey(la,lo)}catch(e){return false}})()));window._hi=hh?L.geoJSON(hh.geo,{style:{color:'#FFD400',weight:5,fillColor:'#FFD400',fillOpacity:.35}}).addTo(map):L.circleMarker([la,lo],{radius:16,color:'#FFD400',weight:4,fill:false}).addTo(map);map.setView([la,lo],19)})}
 }
 function render3(){
@@ -1492,7 +1493,7 @@ async function bldCheck(key,lat,lon){
 const bKey=(lat,lon)=>lat.toFixed(5)+','+lon.toFixed(5);
 /* 직접 지정: 주변 건물을 이격 호수에서 빼거나(false) 다시 넣음(true). 이 브라우저에 저장 */
 let HOUSE_OVR=(()=>{try{return JSON.parse(localStorage.getItem('sms.houseOvr')||'{}')}catch(e){return{}}})();
-const houseCounted=(k,v)=>(HOUSE_OVR[k]===false||HOUSE_OVR[k]==='hide')?false:HOUSE_OVR[k]===true?true:!(v&&v.house===false);
+const houseCounted=(k,v)=>HOUSE_OVR[k]===true; // 기본은 모두 빠짐 → 사용자가 '주택으로 포함'한 건물만 이격 호수로 셈
 const geoKey=g=>{try{const c=turf.centroid(turf.feature(g)).geometry.coordinates;return bKey(c[1],c[0])}catch(e){return ''}};
 function setHouseOvr(k,val){if(val===null)delete HOUSE_OVR[k];else HOUSE_OVR[k]=val;try{localStorage.setItem('sms.houseOvr',JSON.stringify(HOUSE_OVR))}catch(e){}
   if(window.LAY&&LAY.recheck)LAY.recheck();else if(R&&R.nearRaw){computeNear(R,R.nearRaw);judge(R);drawResult(R);renderAll()}}
@@ -2614,7 +2615,7 @@ async function recheckSetback(manual){
     // 조례 판정(기존 방식)이 정한 주거 이격거리. 규제 없음·미적용이면 0
     const D=R.applied&&R.applied.mode!=='free'&&R.applied.house>0?R.applied.house:0;
     const NC=R.applied&&R.applied.count||5;
-    const H=(R.near.houses||[]);parcels.forEach(p=>{p.excluded=false;p.hs=new Set();p.hcount=0});
+    const H=(R.near.houses||[]).filter(h=>h.counted);parcels.forEach(p=>{p.excluded=false;p.hs=new Set();p.hcount=0});
     const A=R.applied;
     if(D>0){parcels.forEach(p=>{const meas=edgeMeasurer(p.feature.geometry||p.feature);p.dist=H.map(h=>meas(h.geo||[h.lon,h.lat]).d);p.hcount=p.dist.filter(x=>x<=D).length;p.viol=setbackViolation(p.dist,A);p.excluded=!!p.viol});
       for(let g=0;g<parcels.length;g++){const k=keptParcels();if(!k.length)break;const um=H.map((h,i)=>Math.min(...k.map(p=>p.dist[i])));if(!setbackViolation(um,A))break;
@@ -2624,7 +2625,7 @@ async function recheckSetback(manual){
     if(kept.length){R.target=makeTarget(R.lat,R.lon,g);computeNear(R,{...raw})}
     judge(R);drawResult(R);renderAll();renderParcelTable();
     const sb=R.setback||{};
-    msg('sbMsg',`${REF_LAYOUT?'⚠ 모든 필지가 조례 이격에 걸립니다. 아래 배치는 참고용 최대 배치입니다(현재 기준으로는 허가가 어려움) · ':ex?`이격 저촉으로 ${ex}필지 제외 · `:''}${REF_LAYOUT?'':`남은 ${kept.length}필지 `}외곽 기준: 가장 가까운 주택 외벽 ${sb.nearAny!=null?fmt(sb.nearAny,1)+'m':'없음'}${D?` · ${D}m 안 ${(R.near.houses||[]).filter(h=>h.d<=D).length}호`:''}${R.verifyMsg?' · '+R.verifyMsg:''}`,REF_LAYOUT);
+    msg('sbMsg',`${REF_LAYOUT?'⚠ 모든 필지가 조례 이격에 걸립니다. 아래 배치는 참고용 최대 배치입니다(현재 기준으로는 허가가 어려움) · ':ex?`이격 저촉으로 ${ex}필지 제외 · `:''}${REF_LAYOUT?'':`남은 ${kept.length}필지 `}외곽 기준: 가장 가까운 주택 외벽 ${sb.nearAny!=null?fmt(sb.nearAny,1)+'m':'없음'}${D?` · ${D}m 안 포함한 주택 ${(R.near.houses||[]).filter(h=>h.counted&&h.d<=D).length}호`:''}${R.verifyMsg?' · '+R.verifyMsg:''}`,REF_LAYOUT);
     autoMax();
   }catch(e){msg('sbMsg','이격거리를 확인하지 못했습니다: '+e.message,true)}
 }
