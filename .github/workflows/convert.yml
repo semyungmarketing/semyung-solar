@@ -1,0 +1,27 @@
+name: 원본 자료 변환
+on:
+  push:
+    paths:
+      - "raw/**"
+      - "scripts/**"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install openpyxl
+      - name: raw → data 변환
+        run: python scripts/convert_raw.py
+      - name: 결과 저장
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "자료 자동 변환 $(date +%F)"
+          git push
