@@ -1336,7 +1336,7 @@ function render2(){
    h+=`<p class="hint"><a href="https://online.kepco.co.kr/" target="_blank" rel="noopener">한전ON</a>에서 최신 접속 가능 여부를 확인하세요.</p>`}
   if((r.parcels||[]).length>1)h+=`<h4 class="sec">선택한 필지 ${r.parcels.length}개</h4><dl class="kv">${r.parcels.map((p,i)=>`<dt>${i+1}. ${esc(p.jibunNo)} ${esc(p.jimok||'')}</dt><dd>${nf(p.area)}㎡</dd>`).join('')}<dt>합계</dt><dd>${nf(r.parcel.area)}㎡ (${nf(r.parcel.area/PY)}평)</dd></dl><p class="hint">용도지역·농업진흥·계통은 첫 번째 필지 기준입니다. 필지마다 다를 수 있으니 각각 눌러 확인하세요.</p>`;
   {const V=Object.entries(r.verify||{}).map(([k,v])=>{const h=(r.near&&r.near.houses||[]).find(x=>x.key===k);return{...v,key:k,dd:h?h.d:v.d}}).sort((a,b)=>(a.dd||0)-(b.dd||0));
-   if(V.length){const L=ringDist(r);h+=`<h4 class="sec">주변 건물 건축물대장 확인 (${basisName(r)} 기준 ${nf(L)}m 안 우선)</h4><div class="tblwrap"><table style="width:100%;font-size:12px;border-collapse:collapse;background:#fff;border:1px solid var(--line)"><thead><tr><th>거리</th><th>대장 주용도</th><th>세대</th><th>판정</th><th></th></tr></thead><tbody>${V.slice(0,60).map(v=>`<tr style="${v.dd<=L?'':'color:#8a958f'}"><td class="num">${nf(v.dd)}m${v.dd<=L?' ●':''}</td><td>${esc(v.purpose)}${v.name?'<br><small>'+esc(v.name)+'</small>':''}</td><td>${v.hhld||''}</td><td>${v.house===true?'<b style="color:var(--bad)">주택</b>':v.house===false?'주택 아님':'대장 없음(미확인)'}</td><td><button class="linkbtn" data-goto="${v.lat},${v.lon}">지도</button></td></tr>`).join('')}</tbody></table></div><p class="hint">● 표시는 ${nf(L)}m 선 안에 걸리는 건물입니다. 주택은 공동주택이면 세대수만큼 호로 셉니다. ${nf(L)}m 안 주택이 5호 이상이면 이격 저촉입니다. 대장 없는 건물은 지도에서 눌러 직접 지정하세요.</p>`}}
+   if(V.length){const L=ringDist(r);h+=`<h4 class="sec">주변 건물 건축물대장 확인 (${basisName(r)} 기준 ${nf(L)}m 안 우선)</h4><div class="tblwrap"><table style="width:100%;font-size:12px;border-collapse:collapse;background:#fff;border:1px solid var(--line)"><thead><tr><th>거리</th><th>대장 주용도</th><th>세대</th><th>판정</th><th></th></tr></thead><tbody>${V.slice(0,60).map(v=>`<tr style="${v.dd<=L?'':'color:#8a958f'}"><td class="num">${nf(v.dd)}m${v.dd<=L?' ●':''}</td><td>${esc(v.purpose)}${v.name?'<br><small>'+esc(v.name)+'</small>':''}</td><td>${v.hhld||''}</td><td>${v.house===true?'<b style="color:var(--bad)">주택</b>':v.house===false?'주택 아님':'대장 없음(미확인)'}</td><td><button class="linkbtn" data-key="${esc(v.key)}" data-goto="${v.lat},${v.lon}">지도</button></td></tr>`).join('')}</tbody></table></div><p class="hint">● 표시는 ${nf(L)}m 선 안에 걸리는 건물입니다. 주택은 공동주택이면 세대수만큼 호로 셉니다. ${nf(L)}m 안 주택이 5호 이상이면 이격 저촉입니다. 대장 없는 건물은 지도에서 눌러 직접 지정하세요.</p>`}}
   {const B=r.bld||[];h+=`<h4 class="sec" id="bldSec">건축물대장 (국토교통부 표제부)</h4>`;
    if(B.length)h+=`<div class="tblwrap"><table style="width:100%;font-size:12px;border-collapse:collapse;background:#fff;border:1px solid var(--line)"><thead><tr><th>건물</th><th>주용도</th><th>구조/지붕</th><th>층·높이</th><th>건축/연면적</th><th>사용승인</th></tr></thead><tbody>${B.map(x=>`<tr><td>${esc(x.dongNm||x.bldNm||x.mainAtch||'')}</td><td>${esc(x.purpose)}${x.hhld?'<br>'+x.hhld+'세대':''}</td><td>${esc(x.strct)}<br>${esc(x.roof)}</td><td>${x.floors||'-'}층${x.bfloors?'/지하'+x.bfloors:''}${x.height?'<br>'+x.height+'m':''}</td><td class="num">${nf(x.archArea)}㎡<br>${nf(x.totArea)}㎡</td><td>${esc((x.useAprDay||'').replace(/(\d{4})(\d{2})(\d{2})/,'$1.$2.$3'))}</td></tr>`).join('')}</tbody></table></div>`;
    else h+=`<p class="hint">${r.bldPending?'조회 중입니다.':r.err&&r.err.bld?'조회하지 못했습니다: '+esc(r.err.bld):'이 필지에 등록된 건축물대장이 없습니다.'}</p>`;
@@ -1345,7 +1345,7 @@ function render2(){
   if(t)h+=`<h4 class="sec">지형</h4><dl class="kv"><dt>평균 경사</dt><dd>${t.slope.toFixed(1)}°</dd><dt>사면향</dt><dd>${t.flat?'평지':aspName(t.aspect)+` (${Math.round(t.aspect)}°)`}</dd><dt>표고</dt><dd>${nf(t.min)}~${nf(t.max)}m</dd></dl>`;
   if(DEBUG)h+=`<h4 class="sec">진단 정보 (debug)</h4><pre style="white-space:pre-wrap;font-size:11px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:320px;overflow:auto">${esc(JSON.stringify({vkey:CFG.vkey?'있음':'없음',domain:CFG.vdomain,time:r.time||null,err:r.err||null,debug:r.debug||null,parcel:r.parcel&&{addr:r.parcel.addr,jimok:r.parcel.jimok,area:r.parcel.area},zone:r.zone,near:r.near&&{total:r.near.total,houses:r.near.houses.length,src:r.near.src}},null,1))}</pre>`;
   $('#t2').innerHTML=h;
-  $$('#t2 [data-goto]').forEach(b=>b.onclick=()=>{const [la,lo]=b.dataset.goto.split(',').map(Number);map.setView([la,lo],18);if(innerWidth<=820)$('#panel').classList.remove('full')});
+  $$('#t2 [data-goto]').forEach(b=>b.onclick=()=>showBuilding(b.dataset.key,b.dataset.goto));
   {const go=u=>{const ad=(r.parcels&&r.parcels.length>1?r.parcels.map(p=>p.jibunNo).join(', '):r.parcel.addr)||'';try{navigator.clipboard.writeText(r.parcel.addr||ad)}catch(e){}toast('주소를 복사했습니다: '+(r.parcel.addr||ad));window.open(u,'_blank','noopener')};
    if($('#btnGov24'))$('#btnGov24').onclick=()=>go('https://www.gov.kr');if($('#btnEais'))$('#btnEais').onclick=()=>go('https://www.eais.go.kr')}
   if($('#ovrReset'))$('#ovrReset').onclick=()=>{if(!confirm('직접 수정한 주택 표시를 모두 되돌릴까요?'))return;HOUSE_OVR={};HOUSE_ADD=[];saveOvr();houseEdited()};
@@ -1433,6 +1433,24 @@ function sunWidget(lat){
   let on=false;const mv=e=>{const b=svg.getBoundingClientRect();const x=(e.clientX-b.left)/b.width*300;sunH=Math.max(-7,Math.min(7,(x-150)/130*6));draw()};
   svg.onpointerdown=e=>{on=true;svg.setPointerCapture(e.pointerId);mv(e)};svg.onpointerup=svg.onpointercancel=()=>on=false;svg.onpointermove=e=>{if(on)mv(e)};
   ['#inDate','#inL','#inTilt'].forEach(id=>$(id).onchange=draw);draw();
+}
+
+/* 건축물대장 표에서 '지도'를 누르면 그 건물로 이동해 외곽을 노랗게 강조하고 대장 내용을 띄움 */
+let hiLayer=null;
+function showBuilding(key,ll){
+  const r=R;if(!r)return;const [la,lo]=ll.split(',').map(Number);
+  if(hiLayer){map.removeLayer(hiLayer);hiLayer=null}
+  let geo=null;const h=(r.near&&r.near.houses||[]).find(x=>x.key===key);if(h&&h.geo)geo=h.geo;
+  if(!geo)for(const p of r.polys||[]){try{const c=turf.centroid(turf.feature(p.geo)).geometry.coordinates;if(bKey(c[1],c[0])===key){geo=p.geo;break}}catch(e){}}
+  const v=(r.verify||{})[key]||{};
+  const txt=`<b>${esc(v.purpose||'건물')}</b>${v.hhld?' · '+v.hhld+'세대':''}<br>${v.house===true?'주택으로 판정':v.house===false?'주택 아님':'대장 없음(주택으로 간주)'}${h?` · ${basisName(r)}에서 ${nf(h.d)}m`:''}${v.useAprDay?'<br>사용승인 '+esc(v.useAprDay.replace(/(\d{4})(\d{2})(\d{2})/,'$1.$2.$3')):''}`;
+  hiLayer=L.layerGroup().addTo(map);
+  if(geo){const g=L.geoJSON(geo,{style:{color:'#FFD400',weight:5,fillColor:'#FFD400',fillOpacity:.35},interactive:false}).addTo(hiLayer);map.fitBounds(g.getBounds().pad(2.5),{maxZoom:19});}
+  else map.setView([la,lo],19);
+  L.marker([la,lo],{opacity:0,interactive:false}).bindTooltip(txt,{permanent:true,direction:'top',offset:[0,-8],className:'lbl'}).addTo(hiLayer).openTooltip();
+  // 깜빡임으로 위치 강조
+  let n=0;const t=setInterval(()=>{if(!hiLayer){clearInterval(t);return}hiLayer.eachLayer(l=>l.setStyle&&l.setStyle({fillOpacity:n%2?.35:.05}));if(++n>5)clearInterval(t)},350);
+  if(innerWidth<=820)$('#panel').classList.remove('full');
 }
 
 /* ===== 측정·그리기 도구 ===== */
