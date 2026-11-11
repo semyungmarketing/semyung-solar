@@ -211,6 +211,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
   <div class="brand">
     <div class="logo" aria-hidden="true"></div>
     <div class="grow"><h1>세명 태양광 부지진단</h1><small>내 땅에 태양광, 세울 수 있을까?</small></div>
+    <span id="adminBadge" style="display:none;background:var(--sun);color:var(--pine);font-size:11.5px;font-weight:700;border-radius:6px;padding:3px 7px">관리자</span>
     <button class="iconbtn" id="btnSettings" title="설정·데이터">⚙ 설정</button>
   </div>
   <div class="searchbox">
@@ -330,6 +331,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
     </div>
     <p class="hint" id="gMsg" role="alert" style="color:var(--bad)"></p>
     <div class="mf" style="padding:12px 0 0;border:0"><button class="btn" id="btnAgree" type="submit" style="width:100%">동의하고 시작하기</button></div>
+    <p style="text-align:right;margin:8px 0 0"><button type="button" class="linkbtn" id="btnAdminGate" style="font-size:12px;color:var(--muted)">관리자 로그인</button></p>
   </form>
 </dialog>
 
@@ -340,6 +342,9 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
     <p class="hint">필지 경계, 지목, 용도지역, 농업진흥지역, 연속지적도, 정확한 주소검색, 건물 용도(주택 판별)에 씁니다. 키는 이 브라우저에만 저장됩니다. 키에 등록한 도메인(예: semyungmarketing.github.io)에서 열어야 작동합니다.</p>
     <div class="field"><label for="cfgKey">인증키</label><input id="cfgKey" type="password" style="text-align:left" placeholder="브이월드 인증키"></div>
     <div class="field"><label for="cfgDomain">등록 도메인</label><input id="cfgDomain" style="text-align:left"></div>
+    <h4 class="sec">관리자</h4>
+    <p class="hint" id="adminStatus"></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" id="btnAdminLogin" type="button">관리자 로그인</button><button class="btn alt" id="btnAdminLogout" type="button">로그아웃</button><a class="btn alt" id="lnkAdminList" href="#" target="_blank" rel="noopener" style="text-decoration:none">이용자 명단 열기</a></div>
     <h4 class="sec">한전 계통 여유용량</h4>
     <p class="hint">필지를 누르면 한전 분산전원연계 정보로 변전소·변압기·선로 여유용량을 조회합니다. 공개 사이트에는 <b>프록시 주소</b>를 쓰세요(키가 노출되지 않음). 인증키 칸은 이 브라우저에만 저장되는 내부 테스트용입니다.</p>
     <div class="field"><label for="cfgProxy">프록시 주소</label><input id="cfgProxy" style="text-align:left" placeholder="https://xxx.workers.dev"></div>
@@ -361,6 +366,10 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
 <dialog id="dlgGlossary"><header><h3>❓ 용어 사전</h3><button data-close aria-label="닫기">×</button></header><div class="mb" id="glossBody"></div></dialog>
 <dialog id="dlgSafety"><header><h3>⚡ 전기안전 체크포인트</h3><button data-close aria-label="닫기">×</button></header><div class="mb" id="safetyBody"></div></dialog>
 <dialog id="dlgSources"><header><h3>ⓘ 데이터 출처</h3><button data-close aria-label="닫기">×</button></header><div class="mb" id="sourcesBody"></div></dialog>
+<dialog id="dlg3d" style="max-width:min(1000px,96vw)"><header><h3>🧊 태양광 배치 3D</h3><button data-close aria-label="닫기">×</button></header>
+  <div class="mb" style="padding:10px 12px"><p class="hint" id="v3msg" style="margin:0 0 8px"></p><div id="v3box" style="width:100%;height:min(560px,62vh);border-radius:10px;overflow:hidden;background:#dfeaf2"></div>
+  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button class="btn alt" id="v3reset" type="button">처음 시점</button><button class="btn alt" id="v3top" type="button">위에서 보기</button>
+  <span class="hint" style="margin:0;align-self:center">건물 높이는 층수 자료(없으면 7m)로 그린 참고용입니다. 빨간 건물은 이격선 안에 걸치는 주택입니다.</span></div></div></dialog>
 <dialog id="dlgOrd"><header><h3>조례 이격거리 데이터</h3><button data-close aria-label="닫기">×</button></header><div class="mb"><div class="tblwrap" id="ordTable"></div></div></dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
@@ -442,7 +451,7 @@ const GLOSSARY = [
 /* ===== 공통 ===== */
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const DEF={vkey:'8ECCB2A4-F393-378E-90A5-8888E133E7F0',vdomain:'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0,roofUse:70,roofPyeongPerKw:2.5,costRoof:1150000,kepcoProxy:'https://semyung-kepco.kmh09412.workers.dev'};
+const DEF={vkey:'8ECCB2A4-F393-378E-90A5-8888E133E7F0',vdomain:'semyungmarketing.github.io',smp:114,rec:71400,fixed:0,cost:1250000,om:25000,insur:0.3,loan:70,rate:4.8,loanYears:15,years:20,pyeongPerKw:4,degr:0.5,hoursManual:0,area:0,module:'hd645',orient:'portrait',arrMode:'rack',tilt:15,shade:23,setback:0.6,costRoof:1150000,kepcoProxy:'https://semyung-kepco.kmh09412.workers.dev'};
 let KEPCO_KEY=localStorage.getItem('sms.kepcoKey')||'';
 let SUBST_AREA={};
 let BASE={...DEF};
@@ -527,6 +536,14 @@ async function vwData(id,geom,size=100){
   if(r.status!=='OK') throw new Error((r.error&&(r.error.text||r.error.code))||r.status);
   return (r.result&&r.result.featureCollection&&r.result.featureCollection.features)||[];
 }
+async function vwDataAll(id,geom,maxPages=4){
+  let all=[];for(let pg=1;pg<=maxPages;pg++){
+    if(!CFG.vkey)throw new Error('브이월드 키 없음');
+    const u=`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=${id}&key=${encodeURIComponent(CFG.vkey)}&domain=${encodeURIComponent(CFG.vdomain)}&geomFilter=${encodeURIComponent(geom)}&crs=EPSG:4326&format=json&errorFormat=json&size=1000&page=${pg}&geometry=true&attribute=true`;
+    const d=await jsonp(u);const rr=d&&d.response;if(!rr||rr.status==='NOT_FOUND')break;if(rr.status!=='OK')throw new Error((rr.error&&(rr.error.text||rr.error.code))||rr.status);
+    const fs=(rr.result&&rr.result.featureCollection&&rr.result.featureCollection.features)||[];all=all.concat(fs);
+    const tot=+((rr.page&&rr.page.total)||0);if(fs.length<1000||(tot&&pg>=tot))break;
+  }return all}
 const OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
 async function overpass(q,ms=12000){return await Promise.any(OVERPASS.map(u=>fetchJSON(u,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}},ms)))}
 
@@ -637,30 +654,31 @@ function classifyVW(p){
 }
 /* 주변 건물: 브이월드 건물과 OSM을 동시에 요청해 합칩니다. 공동주택(빌라 등)은 한 동을 5호로 봅니다 */
 async function fetchNear(r){
-  const a=r.applied,Rb=Math.min(Math.max(a.house||0,200)+100,1100);
+  const a=r.applied,Rb=Math.min(Math.max(a.house||0,200)+300,1300); // 필지·건물 크기를 감안해 넉넉히
   const needRoad=a.mode==='old'&&(a.road>0||a.road2>0),Rr=Math.min(Math.max(a.road||0,a.road2||0)+100,1100);
   const ck=`${r.lat.toFixed(4)},${r.lon.toFixed(4)},${Rb},${needRoad?Rr:0}`;if(NEAR_CACHE.has(ck))return NEAR_CACHE.get(ck);
   const dbg=r.debug=r.debug||{};
   let bld=[],roads=[],src=[],total=0,polys=[];
   const pad=Rb/111000,box=`BOX(${r.lon-pad*1.25},${r.lat-pad},${r.lon+pad*1.25},${r.lat+pad})`;
-  const vw=CFG.vkey?vwData('LT_C_SPBD',box,1000).then(fs=>{dbg.vworld_buildings={count:fs.length,sample:fs.slice(0,3).map(f=>f.properties)};return fs},e=>{dbg.vworld_buildings={error:e.message};return null}):Promise.resolve(null);
+  const vw=CFG.vkey?vwDataAll('LT_C_SPBD',box,4).then(fs=>{dbg.vworld_buildings={count:fs.length,sample:fs.slice(0,3).map(f=>f.properties)};return fs},e=>{dbg.vworld_buildings={error:e.message};return null}):Promise.resolve(null);
   let q=`[out:json][timeout:10];(way["building"](around:${Rb},${r.lat},${r.lon});node["building"](around:${Rb},${r.lat},${r.lon}););out geom tags 3000;`;
   if(needRoad)q+=`way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"](around:${Rr},${r.lat},${r.lon});out geom tags;`;
   const po=overpass(q,9000).then(d=>{dbg.osm={count:(d.elements||[]).length};return d},e=>{dbg.osm={error:String(e&&e.message||e)};return null});
   const fs=await vw;
   if(fs&&fs.length){total+=fs.length;src.push('브이월드 도로명주소 건물');
-    for(const f of fs){const p=f.properties||{};if(f.geometry)polys.push({geo:f.geometry,name:String(p.buld_nm||p.bd_nm||'')});const c=classifyVW(p);if(!c)continue;const xy=turf.centroid(f).geometry.coordinates;bld.push({lat:xy[1],lon:xy[0],kind:c.kind,name:c.name})}}
+    for(const f of fs){const p=f.properties||{};if(f.geometry)polys.push({geo:f.geometry,name:String(p.buld_nm||p.bd_nm||''),floors:+p.gro_flo_co||null});const c=classifyVW(p);if(!c)continue;const xy=turf.centroid(f).geometry.coordinates;bld.push({lat:xy[1],lon:xy[0],kind:c.kind,name:c.name,geo:f.geometry,floors:+p.gro_flo_co||null})}}
   // 브이월드가 있으면 OSM은 3초만 기다려 보완, 없으면 끝까지 기다림
   const o=fs&&fs.length?await Promise.race([po,new Promise(res=>setTimeout(()=>res(null),3000))]):await po;
   if(o){let added=0;
     const vwHas=polys.length>0;
     for(const e of o.elements||[]){const t=e.tags||{};let c=e.center||(e.lat?{lat:e.lat,lon:e.lon}:null);
       if(!c&&e.geometry&&e.geometry.length){c={lat:e.geometry.reduce((s,g)=>s+g.lat,0)/e.geometry.length,lon:e.geometry.reduce((s,g)=>s+g.lon,0)/e.geometry.length}}
-      if(t.building&&!vwHas&&e.type==='way'&&e.geometry&&e.geometry.length>3){const ring=e.geometry.map(g=>[g.lon,g.lat]);if(ring[0][0]!==ring[ring.length-1][0]||ring[0][1]!==ring[ring.length-1][1])ring.push(ring[0]);polys.push({geo:{type:'Polygon',coordinates:[ring]},name:t.name||''})}
+      if(t.building&&!vwHas&&e.type==='way'&&e.geometry&&e.geometry.length>3){const ring=e.geometry.map(g=>[g.lon,g.lat]);if(ring[0][0]!==ring[ring.length-1][0]||ring[0][1]!==ring[ring.length-1][1])ring.push(ring[0]);polys.push({geo:{type:'Polygon',coordinates:[ring]},name:t.name||'',floors:+t['building:levels']||null})}
       if(t.building&&c){total++;if(NONRES.test(t.building)||t.amenity||t.shop||t.office)continue;
         if(bld.some(b=>Math.abs(b.lat-c.lat)<0.00015&&Math.abs(b.lon-c.lon)<0.00018))continue;
         const apt=/^(apartments|dormitory|terrace)$/.test(t.building)||NAME_APT.test(t.name||'');
-        bld.push({lat:c.lat,lon:c.lon,kind:apt?'공동주택':RES.test(t.building)?'단독주택':'주택 추정',name:t.name||''});added++}
+        let hg=null;if(e.type==='way'&&e.geometry&&e.geometry.length>3){const rg=e.geometry.map(g=>[g.lon,g.lat]);if(rg[0][0]!==rg[rg.length-1][0]||rg[0][1]!==rg[rg.length-1][1])rg.push(rg[0]);hg={type:'Polygon',coordinates:[rg]}}
+        bld.push({lat:c.lat,lon:c.lon,kind:apt?'공동주택':RES.test(t.building)?'단독주택':'주택 추정',name:t.name||'',geo:hg});added++}
       else if(t.highway&&e.geometry)roads.push({t,geom:e.geometry})}
     if(added||!src.length)src.push('OpenStreetMap')}
   if(!fs&&!o)throw new Error('주변 건물 자료를 불러오지 못했습니다');
@@ -672,18 +690,44 @@ function autoMode(r){
   const pa=r.parcel&&!r.parcel.manual?r.parcel.area:0;
   r.mode=r.roofArea>=100&&(BLD_JIMOK.test(r.parcel&&r.parcel.jimokCode||'')||!pa||r.roofArea/pa>=0.15)?'roof':'ground';
 }
+/* 이격거리: 발전시설 끝(지상형=필지 경계, 지붕형=지붕 건물 외곽)에서 주택 건물 외벽까지의 가장 짧은 거리 */
+function geoLines(g){const out=[];const rings=g.type==='Polygon'?g.coordinates:g.type==='MultiPolygon'?g.coordinates.flat():[];for(const rg of rings)if(rg.length>1)out.push(turf.lineString(rg));return out}
+function geoVerts(g){return (g.type==='Polygon'?g.coordinates:g.type==='MultiPolygon'?g.coordinates.flat():[]).flat()}
+function facilityGeo(r){
+  if(r.mode==='roof'&&(r.roofs||[]).length)return {type:'MultiPolygon',coordinates:r.roofs.flatMap(b=>b.geo.type==='Polygon'?[b.geo.coordinates]:b.geo.coordinates)};
+  return r.parcel&&r.parcel.geo||null;
+}
+function ringDist(r){const a=r.applied;return a&&a.house>0?a.house:LEGAL.house}
+function houseDistances(r){
+  if(!r.near)return;const F=facilityGeo(r);const L=ringDist(r);
+  const Ff=F?turf.feature(F):null,Fl=F?geoLines(F):[],Fv=F?geoVerts(F):[[r.lon,r.lat]];
+  for(const h of r.near.houses){
+    if(!Ff){h.d=turf.distance([r.lon,r.lat],[h.lon,h.lat],{units:'meters'});}
+    else if(!h.geo){const p=turf.point([h.lon,h.lat]);h.d=turf.booleanPointInPolygon(p,Ff)?0:Math.min(...Fl.map(l=>turf.pointToLineDistance(p,l,{units:'meters'})))}
+    else{const hv=geoVerts(h.geo),hl=geoLines(h.geo),hf=turf.feature(h.geo);let m=1e9;
+      for(const v of hv){const p=turf.point(v);if(turf.booleanPointInPolygon(p,Ff)){m=0;break}for(const l of Fl)m=Math.min(m,turf.pointToLineDistance(p,l,{units:'meters'}))}
+      if(m>0)for(const v of Fv){const p=turf.point(v);if(turf.booleanPointInPolygon(p,hf)){m=0;break}for(const l of hl)m=Math.min(m,turf.pointToLineDistance(p,l,{units:'meters'}))}
+      h.d=m}
+    h.inRing=h.d<=L;
+  }
+  r.near.houses.sort((x,y)=>x.d-y.d);
+  r.near.ringDist=L;r.near.inRing=r.near.houses.filter(h=>h.inRing).length;
+}
 function computeNear(r,raw){
   const tg=r.target;
-  let houses=raw.bld.map(h=>({...h,d:tg.dist(h.lon,h.lat)})).filter(h=>h.d<=raw.Rb).sort((x,y)=>x.d-y.d).slice(0,1500);
+  let houses=raw.bld.map(h=>({...h,d:tg.dist(h.lon,h.lat)})).filter(h=>h.d<=raw.Rb+60).sort((x,y)=>x.d-y.d).slice(0,1500);
   for(const h of houses){let c=0;for(const o of houses){if(Math.abs(o.lat-h.lat)<0.0011&&Math.abs(o.lon-h.lon)<0.0014&&turf.distance([h.lon,h.lat],[o.lon,o.lat],{units:'meters'})<=100)c+=(o.kind==='공동주택'?5:1)}h.cluster=c>=5}
   const roads=raw.roads.map(({t,geom})=>{const line=turf.lineString(geom.map(g=>[g.lon,g.lat]));let m=1e9;for(const v of tg.verts)m=Math.min(m,turf.pointToLineDistance(turf.point(v),line,{units:'meters'}));if(tg.f)for(const g of geom)m=Math.min(m,tg.dist(g.lon,g.lat));const cls=/^(motorway|trunk|primary)/.test(t.highway)?'고속·국도급':'지방도·군도급';return{name:t.name||(t.ref?t.ref+'번 도로':cls),cls,d:m}}).sort((x,y)=>x.d-y.d);
   r.near={houses,roads,solars:[],src:raw.src,Rb:raw.Rb,total:raw.total};
+  r.polys=raw.polys||[];
   // 필지 안 건물(지붕) 찾기: 필지 경계가 있으면 중심점이 필지 안에 있는 건물, 없으면 클릭 지점을 포함한 건물
   const pt=turf.point([r.lon,r.lat]);r.roofs=[];
   for(const b of raw.polys||[]){try{const f=turf.feature(b.geo);const inside=tg.f?turf.booleanPointInPolygon(turf.centroid(f),tg.f):turf.booleanPointInPolygon(pt,f);if(inside)r.roofs.push({geo:b.geo,name:b.name,area:turf.area(f)})}catch(e){}}
   r.roofArea=r.roofs.reduce((s,x)=>s+x.area,0);
+  (r.roofs||[]).forEach(b=>{const m=(raw.polys||[]).find(p=>p.geo===b.geo);if(m)b.floors=m.floors});
   if(r.drawn&&r.modeUser!=='ground'&&(r.roofs.length===0||r.roofArea>r.parcel.area)){r.roofs=[{geo:r.drawn,name:'직접 그린 지붕',area:r.parcel.area}];r.roofArea=r.parcel.area}
   autoMode(r);
+  houseDistances(r);
 }
 
 /* ===== 한전 계통 ===== */
@@ -782,7 +826,7 @@ function judge(r){
   if(jm&&!roof){let lv='ok',d='';if(jm==='임'){lv='warn';d='산지전용 허가 필요, REC 가중치 0.5, 평균경사 15° 이하 등 산지 기준을 따릅니다.'}else if(/^(전|답|과)$/.test(jm)){d='농지전용(타용도 일시사용 포함) 협의가 필요합니다.'}else if(/^(대|잡|장|창|염)$/.test(jm)){d='전용 절차가 비교적 간단한 지목입니다.'}else if(/^(도|천|구|제|철|학|공|묘|사|종)$/.test(jm)){lv='bad';d='공공용지·특수 지목은 설치가 어렵습니다.'}
     it.push({k:'지목',v:r.parcel.jimok,lv,d})}
   // 경사
-  if(roof){it.push(r.nearPending?{k:'지붕 면적',v:'확인 중…',lv:'unk',d:'필지 안 건물을 찾고 있습니다.'}:r.roofArea>0?{k:'지붕 면적',v:`${nf(r.roofArea)}㎡ (${nf(r.roofArea/PY)}평)`,lv:'ok',d:`필지 안 건물 ${r.roofs.length}동의 바닥면적 합계입니다. 지붕 구조 안전진단(하중 검토)과 방수 상태 확인이 필요합니다.`}:{k:'지붕 면적',v:'건물 없음',lv:'warn',d:'필지 안에서 건물 자료를 찾지 못했습니다. 📐 부지 직접 그리기로 지붕을 그려 주세요.'})}
+  if(roof){it.push(r.nearPending?{k:'지붕 면적',v:'확인 중…',lv:'unk',d:'필지 안 건물을 찾고 있습니다.'}:r.roofArea>0?{k:'지붕 면적',v:`${nf(r.roofArea)}㎡ (${nf(r.roofArea/PY)}평)`,lv:'ok',d:`필지 안 건물 ${r.roofs.length}동. ${curMod().label} ${nf(roofLayout(r).count)}장(${nf(roofLayout(r).kw,1)}kW)을 ${roofLayout(r).source==='engine'?'정밀 배치 엔진으로':'간이 추정으로'} 배치했습니다. 지붕 구조 안전진단(하중 검토)과 방수 상태 확인이 필요합니다.`}:{k:'지붕 면적',v:'건물 없음',lv:'warn',d:'필지 안에서 건물 자료를 찾지 못했습니다. 📐 부지 직접 그리기로 지붕을 그려 주세요.'})}
   else if(r.terrain){const s=r.terrain.slope;let lv=s<=10?'ok':s<=15?'warn':(jm==='임'?'bad':'warn');
     let d=s<=10?'완만해서 토목 부담이 적습니다.':s<=15?'다소 경사가 있어 토목비가 늘 수 있습니다.':(jm==='임'?'산지 태양광 평균경사 기준(15°)을 넘을 가능성이 큽니다.':'경사가 커 토목·배수 검토가 필요합니다.');
     const a=r.terrain.aspect;if(!r.terrain.flat&&(a>=292.5||a<67.5))d+=' 북쪽으로 기울어 발전량이 줄어듭니다.';
@@ -809,7 +853,8 @@ function judge(r){
       else sb={lv:'ok',v:'충족 추정',d:`${ref}. 가장 가까운 주거밀집 ${nc!=null?nf(nc)+'m':`반경 ${nf(n.Rb)}m 안에 없음`}. `+a.text};
     }
   }
-  if(roof)sb={lv:'ok',v:'해당 없음',d:'건물 지붕형 태양광은 주택·도로 이격거리 적용 대상이 아닙니다(재생에너지법 시행령). 다만 축사 등 일부 건물은 조례에 사용승인 후 경과기간 같은 조건이 있으니 입지분석 탭의 조례 원문을 확인하세요.'};
+  if(roof)sb={lv:'ok',v:'해당 없음',d:'건물 지붕형 태양광은 주택·도로 이격거리 적용 대상이 아닙니다(재생에너지법 시행령). 다만 축사 등 일부 건물은 조례에 사용승인 후 경과기간 같은 조건이 있으니 입지분석 탭의 조례 원문을 확인하세요.'+(n&&!r.nearPending?` 참고: 지붕 건물 끝에서 ${nf(n.ringDist)}m 선 안에 걸치는 주택 ${nf(n.inRing)}동.`:'')};
+  else if(n&&!r.nearPending&&sb.d&&n.ringDist)sb.d+=` 발전시설 끝에서 ${nf(n.ringDist)}m 선 안에 걸치는 주택 ${nf(n.inRing)}동(지도에 빨간색).`;
   it.push({k:'조례 이격거리',v:sb.v,lv:sb.lv,d:sb.d});
   // 계통
   {const sa=substArea(r);const saTxt=sa?` 이 읍면동의 공급 변전소(한전 2024.5 자료): ${sa.join(', ')}.`:'';
@@ -832,14 +877,19 @@ function drawResult(r){
   judgeLayer.clearLayers();houseLayer.clearLayers();
   const c=[r.lat,r.lon];
   if(r.parcel&&r.parcel.geo){L.geoJSON(r.parcel.geo,{style:{color:'#F2A900',weight:3,fillColor:'#F2A900',fillOpacity:.18}}).addTo(judgeLayer)}
-  (r.roofs||[]).forEach(b=>L.geoJSON(b.geo,{style:{color:'#1a73e8',weight:2,fillColor:'#4dabf7',fillOpacity:r.mode==='roof'?.45:.15}}).bindTooltip(`${esc(b.name||'건물')} · 지붕 ${nf(b.area)}㎡`).addTo(judgeLayer));
+  (r.roofs||[]).forEach(b=>L.geoJSON(b.geo,{style:{color:'#1a73e8',weight:2,fillColor:'#4dabf7',fillOpacity:r.mode==='roof'?.12:.15}}).bindTooltip(`${esc(b.name||'건물')} · 지붕 ${nf(b.area)}㎡`).addTo(judgeLayer));
+  if(r.mode==='roof'&&(r.roofs||[]).length){const Lr=roofLayout(r);const pr=L.canvas({padding:.3});const eng=Lr.source==='engine';(Lr.quads||[]).forEach(q=>L.polygon(q,{renderer:pr,color:eng?'#0b2a6b':'#7a8aa8',weight:.5,fillColor:eng?'#1d4ed8':'#9fb3d9',fillOpacity:eng?.8:.45,interactive:false}).addTo(judgeLayer))}
   L.circleMarker(c,{radius:7,color:'#fff',weight:2,fillColor:'#0F3D2E',fillOpacity:1}).bindTooltip('판정지점',{permanent:false}).addTo(judgeLayer);
   const a=r.applied;
   const ring=(m,color,label)=>{if(!m)return;const g=r.parcel&&r.parcel.geo?turf.buffer(turf.feature(r.parcel.geo),m/1000,{units:'kilometers',steps:24}):turf.circle([r.lon,r.lat],m/1000,{units:'kilometers',steps:64});L.geoJSON(g,{style:{color,weight:2,dashArray:'6 6',fill:false}}).bindTooltip(label,{sticky:true}).addTo(judgeLayer)};
-  if(a.house&&r.mode!=='roof') ring(a.house,'#C8372D',`주거 이격 ${a.house}m`);
+  {const F=facilityGeo(r),Ld=ringDist(r);
+   const g=F?turf.buffer(turf.feature(F),Ld/1000,{units:'kilometers',steps:24}):turf.circle([r.lon,r.lat],Ld/1000,{units:'kilometers',steps:64});
+   L.geoJSON(g,{style:{color:'#C8372D',weight:2.5,dashArray:'8 6',fill:false}}).bindTooltip(`${r.mode==='roof'?'지붕 건물':'발전시설(필지)'} 끝에서 ${Ld}m 선`,{sticky:true}).addTo(judgeLayer)}
   if(a.mode==='old'&&a.road) ring(a.road,'#7a3cc0',`도로 이격 ${a.road}m`);
   if(r.near){
-    r.near.houses.slice(0,600).forEach(h=>L.circleMarker([h.lat,h.lon],{radius:h.cluster?5:3.5,color:h.cluster?'#C8372D':'#fff',weight:1.5,fillColor:h.cluster?'#ff8f85':'#C8372D',fillOpacity:.9}).bindTooltip(`${esc(h.name||h.kind)}${h.name?' ('+h.kind+')':''}${h.cluster?' · 주거밀집(5호+)':''} · ${nf(h.d)}m`).addTo(houseLayer));
+    r.near.houses.slice(0,1500).forEach(h=>{const tip=`${esc(h.name||h.kind)}${h.name?' ('+h.kind+')':''}${h.cluster?' · 주거밀집(5호+)':''} · 발전시설 끝에서 ${nf(h.d)}m${h.inRing?' · 선 안에 걸침':''}`;
+      if(h.geo)L.geoJSON(h.geo,{style:{color:h.inRing?'#C8372D':'#8a958f',weight:h.inRing?2:1,fillColor:h.inRing?'#ff6b5e':'#c9d0cc',fillOpacity:h.inRing?.55:.25}}).bindTooltip(tip,{sticky:true}).addTo(houseLayer);
+      else L.circleMarker([h.lat,h.lon],{radius:h.cluster?5:3.5,color:h.inRing?'#C8372D':'#fff',weight:1.5,fillColor:h.inRing?'#ff6b5e':'#8a958f',fillOpacity:.9}).bindTooltip(tip).addTo(houseLayer)});
     r.near.solars.slice(0,100).forEach(s=>L.circleMarker([s.lat,s.lon],{radius:4,color:'#1a5fb4',weight:1,fillColor:'#62a0ea',fillOpacity:.9}).bindTooltip('기존 태양광'+(s.name?': '+esc(s.name):'')).addTo(judgeLayer));
   }
   if(!$('#lyJudge').checked)map.removeLayer(judgeLayer);if(!$('#lyHouses').checked)map.removeLayer(houseLayer);
@@ -847,16 +897,185 @@ function drawResult(r){
   if(!r._fitted){r._fitted=true;map.fitBounds(b.pad(1.2),{maxZoom:17,paddingTopLeft:[0,0]})}
 }
 
+/* ===== 지붕 모듈 자동 배치 (간이) =====
+   계산기(solar-array-calculator v123) 기본값과 같은 원칙: 가장자리 여유폭, 지붕선 정렬, 남쪽 끝선부터 북쪽으로 진행,
+   경사가대 이격거리 = 프레임 깊이 + 프레임 높이 ÷ tan(음영각), 뒷다리 5m 이하에서 적층 단수 자동 선택. */
+const MODS={
+  hd645:{label:'현대 1등급 645W',model:'HiS-T645NJ-OS',pmax:645,w:1.134,h:2.465,y1:0.99,deg:0.004,calcKey:'hyundai645os'},
+  hw650:{label:'한화 2등급 650W',model:'Q.TRON XL-G2R.9/BFG HJ',pmax:650,w:1.134,h:2.465,y1:0.985,deg:0.0033,calcKey:'hanwha650g2r'}
+};
+const curMod=()=>MODS[CFG.module]||MODS.hd645;
+function ringsOuter(geo){if(!geo)return[];if(geo.type==='Polygon')return[geo.coordinates[0]];if(geo.type==='MultiPolygon')return geo.coordinates.map(p=>p[0]);return[]}
+function hull(pts){const p=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],up=[];for(const q of p){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],q)<=0)lo.pop();lo.push(q)}for(let i=p.length-1;i>=0;i--){const q=p[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],q)<=0)up.pop();up.push(q)}up.pop();lo.pop();return lo.concat(up)}
+function minRectAngle(pts){const h=hull(pts);let best=0,ba=1e18;for(let i=0;i<h.length;i++){const a=h[i],b=h[(i+1)%h.length];const t=Math.atan2(b[1]-a[1],b[0]-a[0]);const c=Math.cos(-t),s=Math.sin(-t);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const p of h){const x=p[0]*c-p[1]*s,y=p[0]*s+p[1]*c;x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}const ar=(x1-x0)*(y1-y0);if(ar<ba){ba=ar;best=t}}return best}
+function scanX(poly,y){const xs=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length];if((a[1]<=y&&b[1]>y)||(b[1]<=y&&a[1]>y)){xs.push(a[0]+(y-a[1])*(b[0]-a[0])/(b[1]-a[1]))}}xs.sort((p,q)=>p-q);const out=[];for(let i=0;i+1<xs.length;i+=2)out.push([xs[i],xs[i+1]]);return out}
+function interIv(A,B){const o=[];for(const a of A)for(const b of B){const l=Math.max(a[0],b[0]),r=Math.min(a[1],b[1]);if(r>l)o.push([l,r])}return o}
+function packOne(ring,o){
+  // 투영(m)
+  const lat0=ring.reduce((s,p)=>s+p[1],0)/ring.length,lon0=ring.reduce((s,p)=>s+p[0],0)/ring.length;
+  const kx=111320*Math.cos(lat0*Math.PI/180),ky=110540;
+  let P=ring.map(p=>[(p[0]-lon0)*kx,(p[1]-lat0)*ky]);
+  if(P.length>3&&P[0][0]===P[P.length-1][0]&&P[0][1]===P[P.length-1][1])P=P.slice(0,-1);
+  if(P.length<3)return null;
+  const base=minRectAngle(P);
+  // 4방향 후보 중 모듈이 바라보는 방향(-y)이 정남에 가장 가까운 회전 선택
+  let th=base,dev=1e9;for(let k=0;k<4;k++){const t=base+k*Math.PI/2;const fx=Math.sin(t),fy=-Math.cos(t);const az=Math.atan2(fx,fy);const d=Math.abs(((az-Math.PI+3*Math.PI)%(2*Math.PI))-Math.PI);if(d<dev){dev=d;th=t}}
+  const c=Math.cos(-th),s=Math.sin(-th);const R=P.map(p=>[p[0]*c-p[1]*s,p[0]*s+p[1]*c]);
+  const m=o.mod,portrait=o.orient!=='landscape',Ls=portrait?m.h:m.w,Wm=portrait?m.w:m.h,gap=0.02;
+  const t=o.flush?0:o.tilt*Math.PI/180,tanS=Math.tan(o.shade*Math.PI/180);
+  const ys=R.map(p=>p[1]),y0=Math.min(...ys),y1=Math.max(...ys);
+  const perRise=Ls*Math.sin(t),perDepth=Ls*Math.cos(t);
+  const maxN=o.flush?1:Math.max(1,Math.floor((o.maxLeg-o.frontLeg)/Math.max(perRise,1e-6)));
+  let best=null;
+  for(let N=1;N<=Math.min(maxN,8);N++){
+    const D=N*perDepth,pitch=o.flush?D+0.0:D+N*perRise/tanS;
+    const rects=[];let count=0;
+    for(let y=y0;y+D<=y1+1e-9;y+=pitch){
+      let iv=null;for(let k=0;k<=Math.ceil(D/0.25);k++){const yy=Math.min(y+k*0.25,y+D);const r=scanX(R,yy+1e-7);iv=iv===null?r:interIv(iv,r);if(!iv.length)break}
+      for(const [a,b] of iv||[]){const n=Math.floor((b-a+gap)/(Wm+gap));if(n<=0)continue;const off=(b-a-(n*(Wm+gap)-gap))/2;
+        for(let i=0;i<n;i++){const x=a+off+i*(Wm+gap);for(let j=0;j<N;j++){rects.push([x,y+j*perDepth,Wm,perDepth]);count++}}}
+    }
+    if(!best||count>best.count)best={count,N,rects,pitch,D};
+  }
+  if(!best||!best.count)return {count:0,rects:[],devDeg:dev*180/Math.PI,N:0};
+  const ci=Math.cos(th),si=Math.sin(th);
+  const toLL=(x,y)=>{const X=x*ci-y*si,Y=x*si+y*ci;return [lat0+Y/ky,lon0+X/kx]};
+  const quads=best.rects.slice(0,4000).map(([x,y,w,h])=>[toLL(x,y),toLL(x+w,y),toLL(x+w,y+h),toLL(x,y+h)]);
+  return {count:best.count,N:best.N,pitch:best.pitch,quads,devDeg:dev*180/Math.PI};
+}
+function approxLayout(r){
+  const mod=curMod();const o={mod,orient:CFG.orient,flush:CFG.arrMode==='flush',tilt:CFG.tilt,shade:CFG.shade,setback:CFG.setback,maxLeg:5,frontLeg:0.8};
+  const key=JSON.stringify([CFG.module,o.orient,o.flush,o.tilt,o.shade,o.setback,(r.roofs||[]).length,Math.round(r.roofArea||0)]);
+  if(r._lay&&r._layKey===key)return r._lay;
+  let count=0,quads=[],devW=0,devS=0,blds=[];
+  for(const b of r.roofs||[]){
+    let geo=b.geo;
+    try{const f=turf.buffer(turf.feature(b.geo),-o.setback,{units:'meters'});geo=f&&f.geometry}catch(e){geo=null}
+    let bc=0;
+    for(const ring of ringsOuter(geo)){const res=packOne(ring,o);if(!res)continue;count+=res.count;bc+=res.count;if(res.quads)quads=quads.concat(res.quads);devW+=res.devDeg*res.count;devS+=res.count;blds.push({N:res.N,pitch:res.pitch})}
+    b.modules=bc;
+  }
+  const dev=devS?devW/devS:0;
+  const lay={count,kw:count*mod.pmax/1000,quads,devDeg:dev,mod,flush:o.flush,tiers:blds.length?Math.max(...blds.map(x=>x.N||0)):0};
+  r._lay=lay;r._layKey=key;return lay;
+}
+
+/* 지붕 어레이 설계 계산기(v123)의 배치 엔진을 숨긴 iframe(같은 사이트 engine/?headless=1)으로 돌려 결과를 그대로 씁니다.
+   엔진 결과가 오기 전에는 간이 추정값을 보여주고, 도착하면 자동으로 바꿉니다. */
+let calcReady=null;
+function calcEngine(){
+  if(calcReady)return calcReady;
+  calcReady=new Promise((res,rej)=>{
+    const f=document.createElement('iframe');f.src='engine/?headless=1';f.title='배치 계산 엔진';f.setAttribute('aria-hidden','true');f.tabIndex=-1;
+    Object.assign(f.style,{position:'fixed',left:'-10000px',top:'0',width:'640px',height:'640px',border:'0',visibility:'hidden'});
+    document.body.appendChild(f);const t0=Date.now();
+    const poll=()=>{let w=null;try{w=f.contentWindow}catch(e){}if(w&&w.SMS_LAYOUT)return res(w);if(Date.now()-t0>25000)return rej(new Error('계산기를 불러오지 못했습니다'));setTimeout(poll,200)};
+    poll();
+  });
+  calcReady.catch(()=>{calcReady=null});
+  return calcReady;
+}
+function engineOpts(){return{module:curMod().calcKey,orientation:CFG.orient,tilt:CFG.arrMode==='flush'?0:CFG.tilt,shadeAngle:CFG.shade,setback:CFG.setback}}
+function roofLayout(r){
+  const ap=approxLayout(r);
+  const rings=(r.roofs||[]).map(b=>ringsOuter(b.geo)[0]).filter(Boolean).map(rg=>rg.map(p=>[p[1],p[0]]));
+  if(!rings.length)return {...ap,source:'none'};
+  const key=JSON.stringify([engineOpts(),rings.length,Math.round(r.roofArea||0)]);
+  if(r._eng&&r._engKey===key)return r._eng;
+  if(r._engJob!==key&&r._engErrKey!==key){
+    r._engJob=key;r._engErr=null;
+    calcEngine().then(w=>{const x=w.SMS_LAYOUT(rings,engineOpts());if(!x||!x.ok)throw new Error('계산 실패');
+        r._eng={count:x.count,kw:x.kw,quads:x.rects,perZone:x.perZone,mod:curMod(),flush:CFG.arrMode==='flush',devDeg:ap.devDeg,tiers:0,source:'engine',version:x.version};r._engKey=key;})
+      .catch(e=>{r._engErr=e.message;r._engErrKey=key})
+      .finally(()=>{if(r._engJob===key)r._engJob=null;if(R===r){judge(r);drawResult(r);renderAll()}});
+  }
+  return {...ap,source:r._engErr?'approx-failed':'approx-pending'};
+}
+setTimeout(()=>{calcEngine().catch(()=>{})},2500); // 첫 분석 전에 미리 불러 둠
+
+
+/* ===== 태양광 배치 3D 보기 (three.js r128, 필요할 때만 불러옴) ===== */
+const needThree=()=>window.THREE?Promise.resolve():loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+let V3=null;
+function bldHeight(b){const f=+b.floors;return f>0?Math.min(f,40)*3.6:7}
+async function open3D(r){
+  if(!r||r.mode!=='roof'||!(r.roofs||[]).length){toast('지붕 건물이 있어야 3D로 볼 수 있습니다.');return}
+  $('#dlg3d').showModal();$('#v3msg').textContent='3D 화면을 준비하고 있습니다…';
+  try{await needThree()}catch(e){$('#v3msg').textContent='3D 프로그램을 불러오지 못했습니다.';return}
+  const Lay=roofLayout(r);
+  $('#v3msg').textContent=`${esc(Lay.mod.label)} ${nf(Lay.count)}장 · ${nf(Lay.kw,1)}kW · ${Lay.source==='engine'?'설계 계산기 엔진 배치':'간이 추정 배치'} · 마우스로 끌어 회전, 휠로 확대`;
+  build3D(r,Lay);
+}
+function build3D(r,Lay){
+  const box=$('#v3box');box.innerHTML='';
+  const W=box.clientWidth||800,H=box.clientHeight||520;
+  const lat0=r.lat,lon0=r.lon,kx=111320*Math.cos(lat0*Math.PI/180),ky=110540;
+  const XY=p=>[(p[0]-lon0)*kx,(p[1]-lat0)*ky]; // [lon,lat] → [동,북] m
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0xdfeaf2);
+  const cam=new THREE.PerspectiveCamera(45,W/H,0.5,5000);
+  const ren=new THREE.WebGLRenderer({antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(W,H);box.appendChild(ren.domElement);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x6b7a70,.75));
+  const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(-60,140,160);scene.add(sun);
+  const toV=(x,y,z)=>new THREE.Vector3(x,z,-y); // 동→x, 북→-z, 높이→y
+  const shapeOf=ring=>{const s=new THREE.Shape();ring.forEach((p,i)=>{const [x,y]=XY(p);i?s.lineTo(x,y):s.moveTo(x,y)});return s};
+  const rings=g=>g.type==='Polygon'?[g.coordinates[0]]:g.type==='MultiPolygon'?g.coordinates.map(c=>c[0]):[];
+  // 바닥
+  const gnd=new THREE.Mesh(new THREE.PlaneGeometry(2000,2000),new THREE.MeshLambertMaterial({color:0xcfd8cf}));gnd.rotation.x=-Math.PI/2;gnd.position.y=-0.05;scene.add(gnd);
+  if(r.parcel&&r.parcel.geo)rings(r.parcel.geo).forEach(rg=>{const m=new THREE.Mesh(new THREE.ShapeGeometry(shapeOf(rg)),new THREE.MeshLambertMaterial({color:0xf2d48a}));m.rotation.x=-Math.PI/2;m.position.y=0.02;scene.add(m)});
+  // 건물 돌출
+  const extr=(g,h,color,op=1)=>rings(g).forEach(rg=>{const geo=new THREE.ExtrudeGeometry(shapeOf(rg),{depth:h,bevelEnabled:false});const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color,transparent:op<1,opacity:op}));m.rotation.x=-Math.PI/2;scene.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x5b6b63}));e.rotation.x=-Math.PI/2;scene.add(e)});
+  const roofSet=new Set((r.roofs||[]).map(b=>b.geo));
+  (r.polys||[]).forEach(p=>{if(roofSet.has(p.geo))return;const c=turf.centroid(turf.feature(p.geo)).geometry.coordinates;if(turf.distance([lon0,lat0],c,{units:'meters'})>220)return;extr(p.geo,bldHeight(p),0xbfc6c2,.9)});
+  (r.near&&r.near.houses||[]).filter(h=>h.inRing&&h.geo&&turf.distance([lon0,lat0],[h.lon,h.lat],{units:'meters'})<=220).forEach(h=>extr(h.geo,6,0xff8a80,.95));
+  const roofs=(r.roofs||[]).map(b=>({b,h:bldHeight(b),f:turf.feature(b.geo)}));
+  roofs.forEach(o=>extr(o.b.geo,o.h,0xe9ece8));
+  // 모듈: 앞(남쪽) 가장자리는 낮게, 뒤는 경사만큼 높게. 앞 모듈과 붙어 있으면 연속 적층으로 한 단씩 올림
+  const t=Lay.flush?0:CFG.tilt*Math.PI/180,leg=Lay.flush?0.15:0.5;
+  const mods=(Lay.quads||[]).map(q=>{const pts=q.map(p=>XY([p[1],p[0]]));const cx=pts.reduce((s,p)=>s+p[0],0)/pts.length,cy=pts.reduce((s,p)=>s+p[1],0)/pts.length;
+    const e1=[pts[1][0]-pts[0][0],pts[1][1]-pts[0][1]],e2=[pts[3][0]-pts[0][0],pts[3][1]-pts[0][1]];const l1=Math.hypot(...e1),l2=Math.hypot(...e2);
+    // 경사 방향(깊이) 축: 남쪽 성분이 더 큰 축
+    let d=Math.abs(e1[1])/l1>Math.abs(e2[1])/l2?e1:e2;const dl=Math.hypot(...d);let f=[d[0]/dl,d[1]/dl];if(f[1]>0)f=[-f[0],-f[1]];
+    const roof=roofs.find(o=>turf.booleanPointInPolygon(turf.point([lon0+cx/kx,lat0+cy/ky]),o.f));
+    return {pts,cx,cy,f,depth:dl,h:roof?roof.h:7}});
+  const key=(x,y)=>Math.round(x/0.4)+','+Math.round(y/0.4);const idx=new Map();mods.forEach((m,i)=>idx.set(key(m.cx,m.cy),i));
+  const tier=new Array(mods.length).fill(-1);
+  const order=mods.map((m,i)=>i).sort((a,b)=>(mods[a].cx*mods[a].f[0]+mods[a].cy*mods[a].f[1])-(mods[b].cx*mods[b].f[0]+mods[b].cy*mods[b].f[1])).reverse();
+  for(const i of order){const m=mods[i];const j=idx.get(key(m.cx+m.f[0]*m.depth,m.cy+m.f[1]*m.depth));tier[i]=(j!==undefined&&tier[j]>=0)?tier[j]+1:0}
+  const pos=[],gap=0.92;
+  mods.forEach((m,i)=>{const rise=t?m.depth*Math.tan(t):0;const base=m.h+leg+tier[i]*rise;
+    const corner=p=>{const sx=m.cx+(p[0]-m.cx)*gap,sy=m.cy+(p[1]-m.cy)*gap;const s=((sx-m.cx)*m.f[0]+(sy-m.cy)*m.f[1])/m.depth; // +0.5=앞, -0.5=뒤
+      return toV(sx,sy,base+(0.5-s)*rise)};
+    const v=m.pts.map(corner);[[0,1,2],[0,2,3]].forEach(tr=>tr.forEach(k=>pos.push(v[k].x,v[k].y,v[k].z)))});
+  const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));pg.computeVertexNormals();
+  scene.add(new THREE.Mesh(pg,new THREE.MeshPhongMaterial({color:0x1b3a8a,specular:0x6a8cff,shininess:60,side:THREE.DoubleSide})));
+  // 카메라: 남동쪽 위에서
+  const allX=mods.length?mods.map(m=>m.cx):[0],allY=mods.length?mods.map(m=>m.cy):[0];
+  const cx=(Math.min(...allX)+Math.max(...allX))/2,cy=(Math.min(...allY)+Math.max(...allY))/2,span=Math.max(60,Math.max(...allX)-Math.min(...allX),Math.max(...allY)-Math.min(...allY));
+  const target=toV(cx,cy,roofs.length?roofs[0].h:5);let az=-0.6,el=0.55,dist=span*1.6;
+  const place=()=>{cam.position.set(target.x+dist*Math.cos(el)*Math.sin(az),target.y+dist*Math.sin(el),target.z+dist*Math.cos(el)*Math.cos(az));cam.lookAt(target);ren.render(scene,cam)};
+  place();
+  const el0=ren.domElement;let drag=null;el0.style.touchAction='none';el0.style.cursor='grab';
+  el0.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};el0.setPointerCapture(e.pointerId)};
+  el0.onpointermove=e=>{if(!drag)return;az-=(e.clientX-drag.x)*0.008;el=Math.max(0.08,Math.min(1.5,el+(e.clientY-drag.y)*0.006));drag={x:e.clientX,y:e.clientY};place()};
+  el0.onpointerup=el0.onpointercancel=()=>drag=null;
+  el0.onwheel=e=>{e.preventDefault();dist=Math.max(10,Math.min(2000,dist*(e.deltaY>0?1.12:0.89)));place()};
+  $('#v3reset').onclick=()=>{az=-0.6;el=0.55;dist=span*1.6;place()};
+  $('#v3top').onclick=()=>{el=1.5;place()};
+  V3={ren,scene};
+}
+
 /* ===== 계산 ===== */
-function capacity(r){if(r.mode==='roof'){const area=r.roofArea||0;return{area,kw:Math.floor(area*CFG.roofUse/100/(CFG.roofPyeongPerKw*PY)),roof:true}}const area=r.parcel.manual?(CFG.area||3300):Math.max(r.parcel.area-(r.roofArea||0),0);const kw=Math.floor(area/(CFG.pyeongPerKw*PY));return{area,kw}}
+function capacity(r){if(r.mode==='roof'){const L=roofLayout(r);return{area:r.roofArea||0,kw:L.kw,roof:true,modules:L.count}}const area=r.parcel.manual?(CFG.area||3300):Math.max(r.parcel.area-(r.roofArea||0),0);const kw=Math.floor(area/(CFG.pyeongPerKw*PY));return{area,kw}}
 function recWeight(kw,jm,roof){if(roof)return kw<=0?1.5:(Math.min(kw,3000)*1.5+Math.max(0,kw-3000)*1.0)/kw;if(jm==='임')return .5;if(kw<=0)return 1.2;return(Math.min(kw,100)*1.2+Math.max(0,Math.min(kw,3000)-100)*1.0+Math.max(0,kw-3000)*.8)/kw}
 function finance(r){
-  const {area,kw,roof}=capacity(r);const hours=CFG.hoursManual>0?CFG.hoursManual:r.sun.hours;
+  const {area,kw,roof}=capacity(r);let hours=CFG.hoursManual>0?CFG.hoursManual:r.sun.hours;
+  if(roof&&!(CFG.hoursManual>0)&&r.sun.ghi){const L=roofLayout(r);const dv=(L.devDeg||0)*Math.PI/180;hours=+(r.sun.ghi*(L.flush?1.0:1.10)*(1-0.1*Math.sin(dv)**2)*0.82).toFixed(2)}
   const w=recWeight(kw,r.parcel.jimokCode,roof);const price=CFG.fixed>0?CFG.fixed:CFG.smp+CFG.rec/1000*w;
   const capex=kw*(roof?CFG.costRoof:CFG.cost),loan=capex*CFG.loan/100,eq=capex-loan,i=CFG.rate/100,nY=CFG.loanYears;
   const pmt=loan>0?(i>0?loan*i/(1-Math.pow(1+i,-nY)):loan/nY):0;
   let cum=-eq,payback=null;const rows=[];
-  for(let y=1;y<=CFG.years;y++){const gen=kw*hours*365*Math.pow(1-CFG.degr/100,y-1);const rev=gen*price;const op=kw*CFG.om+capex*CFG.insur/100;const debt=y<=nY?pmt:0;const cf=rev-op-debt;const prev=cum;cum+=cf;if(payback==null&&cum>=0&&cf>0)payback=y-1+(-prev)/cf;rows.push({y,gen,rev,op,debt,cf,cum})}
+  const md=curMod();for(let y=1;y<=CFG.years;y++){const gen=kw*hours*365*Math.max(0,md.y1-md.deg*(y-1));const rev=gen*price;const op=kw*CFG.om+capex*CFG.insur/100;const debt=y<=nY?pmt:0;const cf=rev-op-debt;const prev=cum;cum+=cf;if(payback==null&&cum>=0&&cf>0)payback=y-1+(-prev)/cf;rows.push({y,gen,rev,op,debt,cf,cum})}
   const tot=rows.reduce((s,x)=>s+x.cf,0);const op1=kw*CFG.om+capex*CFG.insur/100;const simple=rows[0]&&rows[0].rev-op1>0?capex/(rows[0].rev-op1):null;
   return{simple,area,kw,hours,w,price,capex,loan,eq,pmt,rows,payback,gen1:rows[0]?rows[0].gen:0,rev1:rows[0]?rows[0].rev:0,cf1:rows[0]?rows[0].cf:0,net:tot-eq,roi:eq>0?(tot-eq)/eq*100:null};
 }
@@ -866,15 +1085,15 @@ const LV={ok:'가능',warn:'협의 필요',bad:'어려움',unk:'확인 필요'};
 function itemsHTML(it){return `<ul class="items">${it.map(x=>`<li><span class="dot ${x.lv}" aria-label="${LV[x.lv]}"></span><div><div class="k">${esc(x.k)}</div><div class="d">${esc(x.d)}</div></div><div class="v">${esc(x.v)}</div></li>`).join('')}</ul>`}
 function renderAll(){if(!R)return;$('#intro').style.display='none';render1();render2();render3();render4()}
 function modeHTML(r){const roof=r.mode==='roof';return `<div class="seg" role="group" aria-label="설치 방식" style="margin:0 0 12px;box-shadow:none;border:1px solid var(--line)"><button data-mode="roof" aria-pressed="${roof}" style="flex:1">🏭 건물 지붕형</button><button data-mode="ground" aria-pressed="${!roof}" style="flex:1">🌾 토지 지상형</button></div>`}
-function bindMode(){$$('[data-mode]').forEach(b=>b.onclick=()=>{R.modeUser=b.dataset.mode;R.mode=b.dataset.mode;judge(R);drawResult(R);renderAll()})}
+function bindMode(){$$('[data-mode]').forEach(b=>b.onclick=()=>{R.modeUser=b.dataset.mode;R.mode=b.dataset.mode;houseDistances(R);judge(R);drawResult(R);renderAll()})}
 function headHTML(r){const p=r.parcel;return `<p class="addr">${esc(p.addr||`${r.sido} ${r.sgg}`)}</p><p class="sub">${p.jibun?`지번 ${esc(p.jibunNo||p.jibun)} · 지목 ${esc(p.jimok||p.jimokCode||'–')} · `:''}${p.manual?'필지 경계 없음(위치 기준)':nf(p.area)+'㎡ ('+nf(p.area/PY)+'평)'} · ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}</p>`}
-function render1(){setTimeout(bindMode,0);
+function render1(){setTimeout(()=>{bindMode();const b=$('#btn3d1');if(b)b.onclick=()=>open3D(R)},0);
   const r=R,o=r.judge.overall,f=finance(r);
   const msg={ok:'주요 조건에서 걸리는 항목이 없습니다. 지자체 허가부서와 한전 계통 확인 후 추진할 수 있습니다.',warn:'일부 항목은 지자체·관계기관 협의가 필요합니다. 아래 노란 항목을 먼저 확인하세요.',bad:'설치를 어렵게 만드는 항목이 있습니다. 빨간 항목을 확인하세요.',unk:'자료가 부족해 판정하지 못했습니다. ⚙ 설정에서 브이월드 키를 넣으면 정확해집니다.'}[o];
   const lamp=['bad','warn','ok'].map(c=>`<i class="${c===o?'on':''}"></i>`).join('');
   $('#r1').innerHTML=headHTML(r)+modeHTML(r)+`<div class="verdict ${o}"><div class="lamp">${lamp}</div><h3>${{ok:'설치 가능성 높음',warn:'조건부 가능·협의 필요',bad:'설치 어려움',unk:'판정 보류'}[o]}</h3><p>${msg}</p></div>`+itemsHTML(r.judge.items)+
   `<div class="big"><div><b class="num">${R.nearPending&&R.mode==='roof'?'…':nf(f.kw)+'kW'}</b><span>${R.mode==='roof'?'지붕 설치 용량(추정)':'설치 가능 용량(추정)'}</span></div><div><b class="num">${won(f.rev1)}</b><span>첫해 매출</span></div><div><b class="num">${f.payback?nf(f.payback,1)+'년':'–'}</b><span>투자 회수</span></div></div>`+
-  `<p class="hint">${r.mode==='roof'?`건물 지붕형: 필지 안 건물 바닥면적 ${nf(r.roofArea||0)}㎡ 중 ${CFG.roofUse}%를 쓴다고 보고 계산했습니다. 지붕 모양·설비·그늘에 따라 달라집니다. `:`토지 지상형: 필지 면적${r.roofArea?`에서 건물 ${nf(r.roofArea)}㎡를 뺀 ${nf(capacity(r).area)}㎡`:''} 기준입니다. 도로·주차장이 있으면 실제 용량은 더 줄어듭니다. `}이 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 주택 위치는 ${esc(r.near?r.near.src:'–')} 자료 기준이며 누락될 수 있습니다.</p>`;
+  (r.mode==='roof'&&!r.nearPending&&(r.roofs||[]).length?`<button class="btn sun" id="btn3d1" style="width:100%;margin:0 0 10px">🧊 태양광 배치 3D로 보기</button>`:'')+`<p class="hint">${r.mode==='roof'?`건물 지붕형: ${esc(curMod().label)} ${nf(roofLayout(r).count)}장을 지붕에 자동 배치한 ${roofLayout(r).source==='engine'?'결과(설계 계산기 엔진)':'간이 추정'}입니다(여유폭 ${CFG.setback}m, ${CFG.arrMode==='flush'?'지붕 평행 설치':'경사가대 '+CFG.tilt+'°'}). 지붕 경사·설비·그늘은 반영하지 않았습니다. `:`토지 지상형: 필지 면적${r.roofArea?`에서 건물 ${nf(r.roofArea)}㎡를 뺀 ${nf(capacity(r).area)}㎡`:''} 기준입니다. 도로·주차장이 있으면 실제 용량은 더 줄어듭니다. `}이 결과는 공공데이터 자동 분석으로 법적 효력이 없습니다. 주택 위치는 ${esc(r.near?r.near.src:'–')} 자료 기준이며 누락될 수 있습니다.</p>`;
 }
 function render2(){
   const r=R,o=r.ord,a=r.applied,n=r.near,t=r.terrain,z=r.zone;
@@ -893,8 +1112,8 @@ function render2(){
      ${o.url?`<p style="margin:8px 0 0"><a href="${esc(o.url)}" target="_blank" rel="noopener">조례 원문 보기 (자치법규정보시스템)</a></p>`:''}</div>`}
   h+=`<p class="hint">자료: ${esc(ordSrcText(o)||'조례 정보 미수록')}${o?'':' · <a href="https://www.elis.go.kr/" target="_blank" rel="noopener">자치법규정보시스템</a>에서 원문을 확인하세요.'}</p>`;
   if(n){const cl=n.houses.filter(x=>x.cluster).length;
-    h+=`<h4 class="sec">주변 주택·도로 (반경 ${nf(n.Rb)}m)</h4><dl class="kv"><dt>조회된 건물 / 주택(추정)</dt><dd>${nf(n.total)}동 / ${nf(n.houses.length)}동</dd><dt>그중 공동주택(빌라 등)</dt><dd>${nf(n.houses.filter(x=>x.kind==='공동주택').length)}동</dd><dt>주거밀집(100m 안 5호+)에 속한 주택</dt><dd>${nf(cl)}채</dd>
-     <dt>가장 가까운 주택</dt><dd>${r.setback&&r.setback.nearAny!=null?nf(r.setback.nearAny)+'m':'–'}</dd><dt>가장 가까운 주거밀집</dt><dd>${r.setback&&r.setback.nearCluster!=null?nf(r.setback.nearCluster)+'m':'–'}</dd>
+    h+=`<h4 class="sec">주변 주택·도로 · ${r.mode==='roof'?'지붕 건물':'필지 경계'} 끝 기준</h4><dl class="kv"><dt>조회된 건물 / 주택(추정)</dt><dd>${nf(n.total)}동 / ${nf(n.houses.length)}동</dd><dt>그중 공동주택(빌라 등)</dt><dd>${nf(n.houses.filter(x=>x.kind==='공동주택').length)}동</dd><dt>주거밀집(100m 안 5호+)에 속한 주택</dt><dd>${nf(cl)}채</dd>
+     <dt>${nf(n.ringDist||200)}m 선 안에 걸치는 주택</dt><dd>${nf(n.inRing||0)}동</dd><dt>가장 가까운 주택(외벽까지)</dt><dd>${r.setback&&r.setback.nearAny!=null?nf(r.setback.nearAny)+'m':'–'}</dd><dt>가장 가까운 주거밀집</dt><dd>${r.setback&&r.setback.nearCluster!=null?nf(r.setback.nearCluster)+'m':'–'}</dd>
      <dt>가장 가까운 주요도로</dt><dd>${n.roads[0]?esc(n.roads[0].name)+' · '+nf(n.roads[0].d)+'m':'–'}</dd></dl>
      <p class="hint">자료: ${esc(n.src)}. 지도에 빨간 점은 주택, 테두리 진한 점은 주거밀집에 속한 주택입니다. 미등재·신축 주택은 빠질 수 있으니 현장 확인이 필요합니다.</p>`}
   {const g=r.grid,sa=substArea(r);
@@ -912,11 +1131,19 @@ function render3(){
   const r=R,f=finance(r);
   let h=headHTML(r)+`<div class="big"><div><b class="num">${nf(f.kw)}kW</b><span>설치 가능 용량</span></div><div><b class="num">${nf(f.hours,2)}h</b><span>일평균 발전시간</span></div><div><b class="num">${nf(f.gen1/1000)}MWh</b><span>연간 발전량(1년차)</span></div></div>`;
   h+=modeHTML(r);
-  if(r.mode==='roof')h+=`<dl class="kv"><dt>필지 안 건물</dt><dd>${nf((r.roofs||[]).length)}동</dd><dt>지붕(바닥) 면적 합계</dt><dd>${nf(r.roofArea||0)}㎡ (${nf((r.roofArea||0)/PY)}평)</dd>${(r.roofs||[]).slice(0,6).map(b=>`<dt>${esc(b.name||'이름 없는 건물')}</dt><dd>${nf(b.area)}㎡</dd>`).join('')}</dl>
-   <div class="field"><label for="inRoofUse">지붕 사용률(%)</label><input id="inRoofUse" type="number" value="${CFG.roofUse}"></div>
-   <div class="field"><label for="inRoofPy">1kW당 지붕 면적(평)</label><input id="inRoofPy" type="number" step="0.1" value="${CFG.roofPyeongPerKw}"></div>
+  if(r.mode==='roof'){const L=roofLayout(r);
+   h+=`<div class="big"><div><b class="num">${nf(L.count)}장</b><span>${esc(L.mod.label)}</span></div><div><b class="num">${nf(L.kw,1)}kW</b><span>설치 용량(DC)</span></div><div><b class="num">${L.flush?'평행':CFG.tilt+'°'}</b><span>${L.flush?'지붕 평행 설치':'경사가대'}</span></div></div>
+   <div class="field"><label for="inMod">모듈</label><select id="inMod">${Object.entries(MODS).map(([k,m])=>`<option value="${k}"${k===CFG.module?' selected':''}>${m.label}</option>`).join('')}</select></div>
+   <div class="field"><label for="inArr">설치 방식</label><select id="inArr"><option value="rack"${CFG.arrMode==='rack'?' selected':''}>경사가대(평슬라브 기준)</option><option value="flush"${CFG.arrMode==='flush'?' selected':''}>지붕 평행 설치</option></select></div>
+   <div class="field"><label for="inOri">모듈 방향</label><select id="inOri"><option value="portrait"${CFG.orient==='portrait'?' selected':''}>세로형</option><option value="landscape"${CFG.orient==='landscape'?' selected':''}>가로형</option></select></div>
+   ${CFG.arrMode==='rack'?`<div class="field"><label for="inTilt2">설치 경사각(°)</label><input id="inTilt2" type="number" step="1" value="${CFG.tilt}"></div><div class="field"><label for="inShade">음영각(°)</label><input id="inShade" type="number" step="1" value="${CFG.shade}"></div>`:''}
+   <div class="field"><label for="inSetback">가장자리 여유폭(m)</label><input id="inSetback" type="number" step="0.1" value="${CFG.setback}"></div>
+   <dl class="kv"><dt>필지 안 건물</dt><dd>${nf((r.roofs||[]).length)}동 · 바닥 ${nf(r.roofArea||0)}㎡</dd>${(r.roofs||[]).slice(0,6).map(b=>`<dt>${esc(b.name||'이름 없는 건물')}</dt><dd>${nf(b.area)}㎡</dd>`).join('')}</dl>
+   <p class="hint" style="color:${L.source==='engine'?'var(--ok)':'var(--warn)'};font-weight:600">${L.source==='engine'?'✔ 지붕 어레이 설계 계산기('+esc(L.version||'')+')와 같은 엔진으로 계산한 결과입니다.':L.source==='approx-pending'?'⏳ 간이 추정값입니다. 정밀 배치 엔진 결과를 계산하는 중…':'간이 추정값입니다. 정밀 배치 엔진을 불러오지 못했습니다'+(R._engErr?' ('+esc(R._engErr)+')':'')+'.'}</p>
+   <p class="hint">건물 윤곽에서 여유폭을 띄우고, 지붕선에 맞춰 남쪽 끝부터 모듈을 깔아 장수를 셉니다. 경사가대는 이격거리 = 프레임 깊이 + 프레임 높이 ÷ tan(음영각)으로 계산하고 뒷다리 5m 안에서 적층 단수를 고릅니다(계산기 v123과 같은 원칙). 용마루·지붕 경사·환기구·채광창은 반영하지 않으므로 최종 설계는 지붕 어레이 설계 계산기에서 확정하세요.</p>
+   <button class="btn sun" id="btn3d" style="width:100%;margin:4px 0 12px">🧊 3D로 보기</button>
    <div class="field"><label for="inHours">발전시간 직접 입력(h, 0=자동)</label><input id="inHours" type="number" step="0.01" value="${CFG.hoursManual}"></div>
-   <p class="hint">지붕형은 통상 1kW당 2~3평이 필요합니다. 사용률은 환기구·설비·통로·그늘을 뺀 비율입니다. 건물을 잘못 잡았으면 📐 분석도구의 '부지 직접 그리기'로 지붕 범위를 그려 주세요. 일사량: ${esc(r.sun.src)}.</p>`;
+   <p class="hint">일사량: ${esc(r.sun.src)}${r.sun.ghi?` · 수평면 ${r.sun.ghi.toFixed(2)}kWh/㎡·일 × ${L.flush?'평행 설치 1.00':'경사 보정 1.10'} × 방위 보정(정남에서 ${Math.round(L.devDeg)}° 틀어짐) × 시스템효율 0.82`:''}.</p>`;}
   else h+=`${r.parcel.manual?`<div class="field"><label for="inArea">부지 면적(㎡)</label><input id="inArea" type="number" value="${CFG.area||3300}"></div><p class="hint">필지 경계가 없어 면적을 직접 넣습니다. 📐 분석도구의 '부지 직접 그리기'로도 지정할 수 있습니다.</p>`:''}
    <div class="field"><label for="inPy">1kW당 필요 면적(평)</label><input id="inPy" type="number" step="0.1" value="${CFG.pyeongPerKw}"></div>
    <div class="field"><label for="inHours">발전시간 직접 입력(h, 0=자동)</label><input id="inHours" type="number" step="0.01" value="${CFG.hoursManual}"></div>
@@ -930,8 +1157,10 @@ function render3(){
     <div class="field"><label for="inTilt">설치 각도(°)</label><input id="inTilt" type="number" value="30"></div>
     <p class="hint" id="rowOut"></p>`;
   $('#t3').innerHTML=h;
-  const bind=(id,k,re=true)=>{const e=$(id);if(e)e.onchange=()=>{CFG[k]=+e.target.value;saveCfg();if(re){render1();render3();render4()}}};
-  bind('#inArea','area');bind('#inPy','pyeongPerKw');bind('#inHours','hoursManual');bind('#inRoofUse','roofUse');bind('#inRoofPy','roofPyeongPerKw');bindMode();
+  const bind=(id,k,re=true)=>{const e=$(id);if(e)e.onchange=()=>{CFG[k]=+e.target.value;saveCfg();R._lay=null;if(re){drawResult(R);render1();render3();render4()}}};
+  bind('#inArea','area');bind('#inPy','pyeongPerKw');bind('#inHours','hoursManual');bind('#inSetback','setback');bind('#inTilt2','tilt');bind('#inShade','shade');
+  const bs=(id,k)=>{const e=$(id);if(e)e.onchange=()=>{CFG[k]=e.value;saveCfg();R._lay=null;drawResult(R);render1();render3();render4()}};bs('#inMod','module');bs('#inArr','arrMode');bs('#inOri','orient');
+  if($('#btn3d'))$('#btn3d').onclick=()=>open3D(R);bindMode();
   if(r.sun.monthly)needChart().then(()=>{const cv=$('#chMon');if(!cv||cv.dataset.done)return;cv.dataset.done=1;new Chart(cv,{type:'bar',data:{labels:['1','2','3','4','5','6','7','8','9','10','11','12'].map(m=>m+'월'),datasets:[{label:'월 발전량(MWh)',data:r.sun.monthly.map((g,i)=>f.kw*g*1.10*0.82*[31,28,31,30,31,30,31,31,30,31,30,31][i]/1000),backgroundColor:'#F2A900'}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'월별 예상 발전량 (MWh)'}},scales:{y:{beginAtZero:true}}}})}).catch(()=>{})
   sunWidget(r.lat);
 }
@@ -941,8 +1170,8 @@ function render4(){
   <div class="chartbox"><canvas id="chCf"></canvas></div>
   <dl class="kv"><dt>판매 단가</dt><dd>${nf(f.price,1)}원/kWh</dd><dt>REC 가중치</dt><dd>${nf(f.w,3)}</dd><dt>1년차 매출</dt><dd>${won(f.rev1)}</dd><dt>대출금 / 자기자본</dt><dd>${won(f.loan)} / ${won(f.eq)}</dd><dt>연 원리금</dt><dd>${won(f.pmt)}</dd><dt>총사업비 단순 회수(대출 제외)</dt><dd>${f.simple?nf(f.simple,1)+'년':'–'}</dd><dt>${CFG.years}년 누적 순이익</dt><dd>${won(f.net)}</dd><dt>자기자본 대비 수익률(누적)</dt><dd>${f.roi!=null?nf(f.roi,0)+'%':'–'}</dd></dl>
   <h4 class="sec">계산 조건 (바꾸면 바로 다시 계산)</h4>
-  ${[['smp','SMP (원/kWh)',1],['rec','REC 가격 (원/REC)',100],['fixed','고정가격계약 단가 (원/kWh, 0=미사용)',1],[R.mode==='roof'?'costRoof':'cost',R.mode==='roof'?'지붕형 시공단가 (원/kW)':'지상형 시공단가 (원/kW)',10000],['om','운영비 (원/kW·년)',1000],['insur','보험료 (사업비 대비 %/년)',.1],['loan','대출 비율 (%)',5],['rate','대출 금리 (%)',.1],['loanYears','대출 기간 (년)',1],['years','분석 기간 (년)',1],['degr','연간 효율 저하 (%)',.1]].map(x=>`<div class="field"><label for="f_${x[0]}">${x[1]}</label><input id="f_${x[0]}" data-k="${x[0]}" type="number" step="${x[2]}" value="${CFG[x[0]]}"></div>`).join('')}
-  <p class="hint">기본 단가는 2026년 10월 3주차 육지 평균(SMP 114.14원, REC 71,414원, 출처: 전력거래소·신재생원스톱 집계)을 반올림한 값입니다. 시공단가와 운영비는 회사 견적 기준으로 바꿔 쓰세요. 세금·출력제어·부지 임대료는 반영하지 않았습니다.</p>
+  ${[['smp','SMP (원/kWh)',1],['rec','REC 가격 (원/REC)',100],['fixed','고정가격계약 단가 (원/kWh, 0=미사용)',1],[R.mode==='roof'?'costRoof':'cost',R.mode==='roof'?'지붕형 시공단가 (원/kW)':'지상형 시공단가 (원/kW)',10000],['om','운영비 (원/kW·년)',1000],['insur','보험료 (사업비 대비 %/년)',.1],['loan','대출 비율 (%)',5],['rate','대출 금리 (%)',.1],['loanYears','대출 기간 (년)',1],['years','분석 기간 (년)',1]].map(x=>`<div class="field"><label for="f_${x[0]}">${x[1]}</label><input id="f_${x[0]}" data-k="${x[0]}" type="number" step="${x[2]}" value="${CFG[x[0]]}"></div>`).join('')}
+  <p class="hint">기본 단가는 2026년 10월 3주차 육지 평균(SMP 114.14원, REC 71,414원, 출처: 전력거래소·신재생원스톱 집계)을 반올림한 값입니다. 시공단가와 운영비는 회사 견적 기준으로 바꿔 쓰세요. 효율 저하는 선택한 모듈의 출력 보증값(${esc(curMod().label)}: 첫해 ${(curMod().y1*100).toFixed(1)}%, 이후 연 ${(curMod().deg*100).toFixed(2)}%)을 씁니다. 세금·출력제어·부지 임대료는 반영하지 않았습니다.</p>
   <div class="tblwrap"><table style="width:100%;font-size:12.5px;border-collapse:collapse"><thead><tr><th>년</th><th>발전량(MWh)</th><th>매출</th><th>순현금</th><th>누적</th></tr></thead><tbody>${f.rows.map(x=>`<tr><td>${x.y}</td><td class="num">${nf(x.gen/1000,0)}</td><td class="num">${won(x.rev)}</td><td class="num">${won(x.cf)}</td><td class="num">${won(x.cum)}</td></tr>`).join('')}</tbody></table></div>`;
   $('#t4').innerHTML=h;
   $$('#t4 input[data-k]').forEach(e=>e.onchange=()=>{CFG[e.dataset.k]=+e.value;saveCfg();render1();render4();if($('#t3').classList.contains('on'))render3()});
@@ -1031,7 +1260,7 @@ $('#lySolar').onchange=e=>{if(e.target.checked){viewLayers.solar.addTo(map);load
 map.on('moveend',()=>{clearTimeout(viewTimer);viewTimer=setTimeout(loadView,700)});
 
 /* ===== 범례 ===== */
-function legend(){$('#legend').onclick=()=>$('#legend').classList.toggle('open');$('#legend').innerHTML=`<b>🗺 범례 <small class="mob" style="font-weight:400;color:#5B6B63">(눌러서 펼치기)</small></b>${Object.values(ST).map(s=>`<div class="row"><i style="background:${s.c}"></i>${s.t}</div>`).join('')}<div class="row"><i style="background:#C8372D;border-radius:50%"></i>주택(추정) · 진한 테두리=주거밀집</div><div class="row"><i style="border:2px dashed #C8372D;background:none"></i>주거 이격 반경</div><div class="row"><i style="background:#62a0ea;border-radius:50%"></i>기존 태양광(OSM)</div>`}
+function legend(){$('#legend').onclick=()=>$('#legend').classList.toggle('open');$('#legend').innerHTML=`<b>🗺 범례 <small class="mob" style="font-weight:400;color:#5B6B63">(눌러서 펼치기)</small></b>${Object.values(ST).map(s=>`<div class="row"><i style="background:${s.c}"></i>${s.t}</div>`).join('')}<div class="row"><i style="background:#ff6b5e;border:1.5px solid #C8372D"></i>이격선 안에 걸치는 주택</div><div class="row"><i style="background:#c9d0cc;border:1px solid #8a958f"></i>그 밖의 주택(추정)</div><div class="row"><i style="border:2px dashed #C8372D;background:none"></i>발전시설 끝에서 이격선(200m 등)</div><div class="row"><i style="background:#62a0ea;border-radius:50%"></i>기존 태양광(OSM)</div>`}
 
 /* ===== 모달 ===== */
 $$('[data-modal]').forEach(b=>b.onclick=()=>$('#'+b.dataset.modal).showModal());
@@ -1039,7 +1268,8 @@ $$('dialog [data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 $$('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d&&d.id!=='dlgAgree')d.close()}));
 const POLICY_VER='2026-11-02';
 const LEAD_TTL=24*60*60*1000; // 하루마다 다시 묻기
-const leadDone=()=>{try{const o=JSON.parse(localStorage.getItem('sms.lead')||'null');return !!o&&o.v===POLICY_VER&&Date.now()-o.t<LEAD_TTL}catch(e){return false}};
+let ADMIN=false;
+const leadDone=()=>{if(ADMIN)return true;try{const o=JSON.parse(localStorage.getItem('sms.lead')||'null');return !!o&&o.v===POLICY_VER&&Date.now()-o.t<LEAD_TTL}catch(e){return false}};
 function prefillGate(){try{const o=JSON.parse(localStorage.getItem('sms.leadInfo')||'null');if(o){$('#gName').value=o.name||'';$('#gPhone').value=o.phone||'';$('#gPhone').dispatchEvent(new Event('input'))}}catch(e){}}
 setInterval(()=>{if(!leadDone()&&!$('#dlgAgree').open){prefillGate();$('#dlgAgree').showModal()}},60*1000);
 $('#cAll').onchange=e=>$$('.cc').forEach(c=>c.checked=e.target.checked);
@@ -1068,7 +1298,7 @@ function staticDialogs(){
   <tr><td>용도지역</td><td>계획·생산관리, 농림, 자연녹지, 공업 → 가능 / 보전관리, 생산녹지, 주거·상업, 농업보호구역 → 협의 / 자연환경보전, 보전녹지, 농업진흥구역, 개발제한구역 → 어려움</td></tr>
   <tr><td>지목</td><td>대·잡종지·공장용지 → 유리 / 전·답·과 → 농지전용 협의 / 임야 → 산지전용·REC 0.5 / 도로·하천 등 공공용지 → 어려움</td></tr>
   <tr><td>경사</td><td>필지 범위 5×5 고도 격자로 평면을 맞춰 평균 경사를 구합니다. 10° 이하 가능, 15° 이하 협의, 임야에서 15° 초과는 어려움</td></tr>
-  <tr><td>조례 이격거리</td><td>필지 경계에서 주택까지 거리를 잽니다. 반경 100m 안에 주택이 5호 이상이면 '주거밀집'으로 봅니다. 빌라·아파트 등 공동주택은 한 동을 5호로 봅니다(세대 수 산정은 고시 기준이므로 허가부서 확인). 2026.9.18 시행 국가 상한(주거 최대 200m, 도로 이격 금지)을 적용하되, 기존 조례를 계속 적용한다고 답한 지자체는 조례값으로 판정합니다.</td></tr>
+  <tr><td>조례 이격거리</td><td>발전시설 끝(지상형은 필지 경계, 지붕형은 지붕 건물 외곽)에서 이격거리만큼 선을 긋고, 주택 건물이 그 선 안에 조금이라도 걸치면 표시합니다(외벽까지의 가장 짧은 거리). 반경 100m 안에 주택이 5호 이상이면 '주거밀집'으로 봅니다. 빌라·아파트 등 공동주택은 한 동을 5호로 봅니다(세대 수 산정은 고시 기준이므로 허가부서 확인). 2026.9.18 시행 국가 상한(주거 최대 200m, 도로 이격 금지)을 적용하되, 기존 조례를 계속 적용한다고 답한 지자체는 조례값으로 판정합니다.</td></tr>
   <tr><td>계통</td><td>한전 분산전원연계 정보에서 필지 주소의 변전소·변압기·선로(DL) 여유용량을 받아, 셋 중 가장 작은 값이 예상 설치 용량 이상이면 가능, 작으면 협의, 0 이하면 어려움</td></tr></table>
   <p class="hint">조례 데이터 우선순위: 설정에서 불러온 엑셀 → 조례 모니터링 엑셀(data/ordinances.json) → 내장 자료(출처 명시) → 법정 상한 가정.</p>`;
   $('#safetyBody').innerHTML=`<p>태양광 발전설비를 안전하게 운영하기 위해 현장에서 자주 확인하는 항목입니다.</p><dl>
@@ -1132,7 +1362,18 @@ async function loadAuto(){
 
 /* ===== 시작 ===== */
 buildSgg();legend();staticDialogs();render5();keyNotice();loadAuto();
-if(!leadDone()){prefillGate();$('#dlgAgree').showModal()}
+/* 관리자: 비밀번호로 한 번 로그인하면 이 브라우저에서 180일 동안 이용 신청 없이 사용 */
+const workerBase=()=>(CFG.kepcoProxy||'').replace(/\/$/,'');
+function adminUI(){$('#adminBadge').style.display=ADMIN?'inline-block':'none';$('#adminStatus').textContent=ADMIN?'관리자로 로그인되어 있습니다. 이 브라우저에서는 이용 신청 없이 바로 사용합니다.':'로그인하면 이 브라우저에서 180일 동안 이용 신청 창이 뜨지 않습니다.';$('#btnAdminLogout').style.display=ADMIN?'':'none';$('#lnkAdminList').href=workerBase()+'/admin'}
+async function adminLogin(){const pw=prompt('관리자 비밀번호를 입력하세요');if(!pw)return;
+  try{const r=await fetch(workerBase()+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.ok)throw new Error(d.error||('HTTP '+r.status));localStorage.setItem('sms.adminToken',d.token);ADMIN=true;adminUI();if($('#dlgAgree').open)$('#dlgAgree').close();toast('관리자로 로그인했습니다.')}
+  catch(e){alert('로그인하지 못했습니다: '+e.message)}}
+$('#btnAdminGate').onclick=adminLogin;$('#btnAdminLogin').onclick=adminLogin;
+$('#btnAdminLogout').onclick=()=>{localStorage.removeItem('sms.adminToken');ADMIN=false;adminUI();toast('로그아웃했습니다.')};
+(async()=>{const t=localStorage.getItem('sms.adminToken');
+  if(t){try{const r=await fetch(workerBase()+'/verify?t='+encodeURIComponent(t),{cache:'no-store'});const d=await r.json();ADMIN=!!d.ok;if(!ADMIN)localStorage.removeItem('sms.adminToken')}catch(e){ADMIN=Number(t.split('.')[0])>Date.now()}}
+  adminUI();if(!leadDone()){prefillGate();$('#dlgAgree').showModal()}})();
 
 </script>
 </body>
