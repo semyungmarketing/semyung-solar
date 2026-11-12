@@ -1177,7 +1177,7 @@ const LV={ok:'가능',warn:'협의 필요',bad:'어려움',unk:'확인 필요'};
 function itemsHTML(it){return `<ul class="items">${it.map(x=>`<li><span class="dot ${x.lv}" aria-label="${LV[x.lv]}"></span><div><div class="k">${esc(x.k)}</div><div class="d">${esc(x.d)}</div></div><div class="v">${esc(x.v)}</div></li>`).join('')}</ul>`}
 function renderAll(){if(!R)return;$('#intro').style.display='none';render1();render2();render3();render4();if(window.LAY)LAY.onResult(R)}
 function modeHTML(r){const roof=r.mode==='roof';return `<div class="seg" role="group" aria-label="설치 방식" style="margin:0 0 12px;box-shadow:none;border:1px solid var(--line)"><button data-mode="roof" aria-pressed="${roof}" style="flex:1">🏭 건물 지붕형</button><button data-mode="ground" aria-pressed="${!roof}" style="flex:1">🌾 토지 지상형</button></div>`}
-function bindMode(){$$('[data-mode]').forEach(b=>b.onclick=()=>{R.modeUser=b.dataset.mode;R.mode=b.dataset.mode;judge(R);drawResult(R);renderAll()})}
+function bindMode(){$$('[data-mode]').forEach(b=>b.onclick=()=>{R.modeUser=b.dataset.mode;R.mode=b.dataset.mode;setTimeout(()=>{if(window.LAY){LAY.applyOrd();LAY.recheck()}},0);judge(R);drawResult(R);renderAll()})}
 function headHTML(r){const p=r.parcel;return `<p class="addr">${esc(p.addr||`${r.sido} ${r.sgg}`)}</p><p class="sub">${p.jibun?`지번 ${esc(p.jibunNo||p.jibun)} · 지목 ${esc(p.jimok||p.jimokCode||'–')} · `:''}${p.manual?'필지 경계 없음(위치 기준)':nf(p.area)+'㎡ ('+nf(p.area/PY)+'평)'} · ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}</p>`}
 function render1(){setTimeout(bindMode,0);
   const r=R,o=r.judge.overall,f=finance(r);
@@ -1911,6 +1911,13 @@ function getParams(){
 }
 let unionCache={key:'',u:null,total:0};
 function siteUnion(sb){
+  // 건물 지붕형: 필지 안 건물 지붕(이격에 걸린 건물 제외)에 배치
+  if(typeof R!=='undefined'&&R&&R.mode==='roof'&&(R.roofs||[]).length){
+    const rs=R.roofs.filter(b=>!b.blocked);if(!rs.length)return{u:null,total:0};
+    const key='roof#'+rs.map(b=>Math.round(b.area)).join('|')+'#'+sb;if(unionCache.key===key)return unionCache;
+    let u=turf.feature(rs[0].geo);for(let i=1;i<rs.length;i++){try{const x=turf.union(u,turf.feature(rs[i].geo));if(x)u=x}catch(e){}}
+    const total=turf.area(u);if(sb>0){u=turf.buffer(u,-sb,{units:'meters'});if(!u||!u.geometry)u=null}
+    unionCache={key,u,total};return unionCache}
   const ps=keptParcels();if(!ps.length)return{u:null,total:0};
   const key=ps.map(p=>p.pnu||p.jibun).join('|')+'#'+sb+'#'+ps.length;
   if(unionCache.key===key)return unionCache;
@@ -2594,7 +2601,8 @@ const keptParcels=()=>{const k=parcels.filter(p=>!p.excluded);REF_LAYOUT=!k.leng
 /* 이 시군 조례의 배치 기준(부지경계 완충폭, 모듈 연속 설치 길이·구간 간격, 모듈 이격) */
 function ordLay(){const o=(typeof R!=='undefined'&&R&&R.ord)||{};return{buf:+o.buf||0,contLen:+o.contLen||0,contGap:+o.contGap||0,modGap:+o.modGap||0}}
 function applyOrdLay(){const O=ordLay(),t=[];
-  if(O.buf>0){$('setback').value=O.buf;t.push(`부지경계 완충 ${O.buf}m`)}else $('setback').value=0;
+  const roof=typeof R!=='undefined'&&R&&R.mode==='roof';
+  if(roof){$('setback').value=0.6;t.push('건물 지붕형: 지붕 가장자리 여유 0.6m')}else if(O.buf>0){$('setback').value=O.buf;t.push(`부지경계 완충 ${O.buf}m`)}else $('setback').value=0;
   if(O.contLen>0)t.push(`모듈 연속 ${O.contLen}m 이내·구간 사이 ${O.contGap}m 이상`);
   if(O.modGap>0){$('minGap').value=Math.max(parseFloat($('minGap').value)||0,O.modGap);t.push(`모듈(어레이) 이격 ${O.modGap}m 이상`)}
   unionCache={};const el=$('ordLayMsg');if(el)el.innerHTML=t.length?`📜 <b>조례 배치 기준 적용</b>: ${t.join(' · ')} — 최대 배치도 이 기준 안에서 찾습니다.`:'📜 이 시군 조례에서 배치 관련 기준(완충폭·연속 길이 등)은 찾지 못했습니다.'}
@@ -2620,11 +2628,13 @@ async function recheckSetback(manual){
     if(D>0){parcels.forEach(p=>{const meas=edgeMeasurer(p.feature.geometry||p.feature);p.dist=H.map(h=>meas(h.geo||[h.lon,h.lat]).d);p.hcount=p.dist.filter(x=>x<=D).length;p.viol=setbackViolation(p.dist,A);p.excluded=!!p.viol});
       for(let g=0;g<parcels.length;g++){const k=keptParcels();if(!k.length)break;const um=H.map((h,i)=>Math.min(...k.map(p=>p.dist[i])));if(!setbackViolation(um,A))break;
         k.sort((x,y)=>y.dist.filter(v=>v<=D).length-x.dist.filter(v=>v<=D).length||Math.min(...x.dist)-Math.min(...y.dist))[0].excluded=true}}
+    if(R.mode==='roof'){(R.roofs||[]).forEach(b=>{b.blocked=false;b.viol=null;if(!(D>0))return;const meas=edgeMeasurer(b.geo);const ds=H.map(h=>meas(h.geo||[h.lon,h.lat]).d);b.viol=setbackViolation(ds,A);b.blocked=!!b.viol})}
     const kept=keptParcels(),ex=parcels.filter(p=>p.excluded).length;unionCache={};
     const g=kept.length?siteUnionGeo():null;R.siteGeo=g&&parcels.length>1?g:(kept.length?null:R.siteGeo);
     if(kept.length){R.target=makeTarget(R.lat,R.lon,g);computeNear(R,{...raw})}
     judge(R);drawResult(R);renderAll();renderParcelTable();
     const sb=R.setback||{};
+    if(R.mode==='roof'){const rs=R.roofs||[],bl=rs.filter(b=>b.blocked).length;msg('sbMsg',`건물 지붕형: 필지 안 건물 ${rs.length}동${bl?` 중 ${bl}동은 이격 기준에 걸려 제외`:''} · 건물 외곽 기준 이격 확인${D?` (${D}m)`:''}`,bl===rs.length&&rs.length>0);if(rs.length&&bl<rs.length){autoMax();return}if(!rs.length){msg('sbMsg','필지 안에 지붕으로 쓸 건물이 없습니다. 토지 지상형으로 바꿔 보세요.',true);return}}
     msg('sbMsg',`${REF_LAYOUT?'⚠ 모든 필지가 조례 이격에 걸립니다. 아래 배치는 참고용 최대 배치입니다(현재 기준으로는 허가가 어려움) · ':ex?`이격 저촉으로 ${ex}필지 제외 · `:''}${REF_LAYOUT?'':`남은 ${kept.length}필지 `}외곽 기준: 가장 가까운 주택 외벽 ${sb.nearAny!=null?fmt(sb.nearAny,1)+'m':'없음'}${D?` · ${D}m 안 포함한 주택 ${(R.near.houses||[]).filter(h=>h.counted&&h.d<=D).length}호`:''}${R.verifyMsg?' · '+R.verifyMsg:''}`,REF_LAYOUT);
     autoMax();
   }catch(e){msg('sbMsg','이격거리를 확인하지 못했습니다: '+e.message,true)}
