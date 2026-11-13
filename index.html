@@ -426,7 +426,7 @@ dialog dt{font-weight:700;margin-top:10px}dialog dd{margin:2px 0 0;color:var(--m
           <div><label>시작점 미세 이동</label><div class="btns" style="margin-top:0"><button data-anc="0,1" title="앞쪽(모듈이 바라보는 쪽)">▲ 앞</button><button data-anc="0,-1" title="뒤쪽">▼ 뒤</button><button data-anc="-1,0" title="열 방향 −">◀</button><button data-anc="1,0" title="열 방향 +">▶</button></div></div>
         </div>
         <div class="hint">시작점 = 첫 어레이의 앞쪽(낮은 쪽) 모서리. 지도에 찍은 뒤 📍 표시를 끌어서 옮길 수도 있고, 시작점을 기준으로 앞뒤·좌우 같은 간격의 격자로 부지 전체를 채웁니다. 시작점을 쓰면 위의 앞뒤 이동·좌우 정렬은 무시됩니다.</div>
-        <div class="btns"><button id="maxRun" class="primary">⚡ 최대 배치 다시 찾기</button><button id="bestAz">최적 각도 찾기 (현재 ±45°)</button></div>
+        <div class="btns"><button id="roofPick">🏭 지붕 건물 추가·빼기 (지도 클릭)</button><button id="maxRun" class="primary">⚡ 최대 배치 다시 찾기</button><button id="bestAz">최적 각도 찾기 (현재 ±45°)</button></div>
         <div class="hint" id="bestMsg">슬라이더·버튼을 움직이면 지도 배치가 바로 바뀌고, 손을 떼면 발전량까지 다시 계산합니다.</div>
       </div>
       <div class="row">
@@ -977,7 +977,10 @@ function computeNear(r,raw){
   r.near={houses,roads,solars:[],src:raw.src,Rb:raw.Rb,total:raw.total};
   // 필지 안 건물(지붕) 찾기: 필지 경계가 있으면 중심점이 필지 안에 있는 건물, 없으면 클릭 지점을 포함한 건물
   const pt=turf.point([r.lon,r.lat]);r.roofs=[];
-  for(const b of raw.polys||[]){try{const f=turf.feature(b.geo);const inside=tg.f?turf.booleanPointInPolygon(turf.centroid(f),tg.f):turf.booleanPointInPolygon(pt,f);if(inside)r.roofs.push({geo:b.geo,name:b.name,area:turf.area(f)})}catch(e){}}
+  for(const b of raw.polys||[]){try{const f=turf.feature(b.geo);let inside=false;if(tg.f){if(turf.booleanPointInPolygon(turf.centroid(f),tg.f))inside=true;else{try{const it=turf.intersect(f,tg.f);inside=!!it&&turf.area(it)>=turf.area(f)*0.5}catch(e){}}}else inside=turf.booleanPointInPolygon(pt,f);if(inside)r.roofs.push({geo:b.geo,name:b.name,area:turf.area(f)})}catch(e){}}
+  // 직접 지정: 지도에서 누른 건물을 지붕에 넣거나 뺌
+  {const ov=window.ROOF_OVR||{};const has=new Set(r.roofs.map(b=>geoKey(b.geo)));r.roofs=r.roofs.filter(b=>ov[geoKey(b.geo)]!==false);
+   for(const b of raw.polys||[]){const k=geoKey(b.geo);if(ov[k]===true&&!has.has(k)){try{r.roofs.push({geo:b.geo,name:b.name,area:turf.area(turf.feature(b.geo))})}catch(e){}}}}
   r.roofArea=r.roofs.reduce((s,x)=>s+x.area,0);
   if(r.drawn&&r.modeUser!=='ground'&&(r.roofs.length===0||r.roofArea>r.parcel.area)){r.roofs=[{geo:r.drawn,name:'직접 그린 지붕',area:r.parcel.area}];r.roofArea=r.parcel.area}
   autoMode(r);
@@ -1347,7 +1350,10 @@ function toolFinish(){
   if(tool==='draw'&&tpts.length>=3){const ring=[...tpts.map(p=>[p.lng,p.lat]),[tpts[0].lng,tpts[0].lat]];const g={type:'Polygon',coordinates:[ring]};const c=turf.centroid(g).geometry.coordinates;setTool('draw');analyze(L.latLng(c[1],c[0]),g);return}
   tool=null;$$('.tool').forEach(b=>b.setAttribute('aria-pressed',false));map.doubleClickZoom.enable();map.getContainer().style.cursor='';
 }
-map.on('click',e=>{if(tool){tpts.push(e.latlng);toolUpdate();return}if(window.LAY&&LAY.click(e))return;toast('필지는 위 검색창에서 지번·주소로 검색해 선택하세요. 배치설계 탭에서 필지를 더 추가할 수 있습니다.')});
+map.on('click',e=>{if(window.ROOF_PICK&&R&&R.nearRaw){const pt=turf.point([e.latlng.lng,e.latlng.lat]);const b=(R.nearRaw.polys||[]).find(p=>{try{return turf.booleanPointInPolygon(pt,turf.feature(p.geo))}catch(x){return false}});
+    if(!b){toast('그 위치에 건물이 없습니다.');return}const k=geoKey(b.geo),isRoof=(R.roofs||[]).some(x=>geoKey(x.geo)===k);window.ROOF_OVR=window.ROOF_OVR||{};ROOF_OVR[k]=!isRoof;
+    toast(isRoof?'지붕에서 뺐습니다. 다시 배치합니다.':'지붕으로 넣었습니다. 다시 배치합니다.');if(window.LAY&&LAY.recheck)LAY.recheck();return}
+  if(tool){tpts.push(e.latlng);toolUpdate();return}if(window.LAY&&LAY.click(e))return;toast('필지는 위 검색창에서 지번·주소로 검색해 선택하세요. 배치설계 탭에서 필지를 더 추가할 수 있습니다.')});
 map.on('dblclick',e=>{if(tool){L.DomEvent.stop(e);toolFinish()}});
 $('#measureOut').addEventListener('click',()=>{if(tool&&(tool!=='draw'||tpts.length<3)){setTool(tool)}else if(tool)toolFinish();else{$('#measureOut').style.display='none';if(tline){map.removeLayer(tline);tline=null}}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&tool){if(tool==='draw'&&tpts.length>=3)toolFinish();else{setTool(tool);}}});
@@ -2625,7 +2631,7 @@ async function recheckSetback(manual){
     const NC=R.applied&&R.applied.count||5;
     const H=(R.near.houses||[]).filter(h=>h.counted);parcels.forEach(p=>{p.excluded=false;p.hs=new Set();p.hcount=0});
     const A=R.applied;
-    if(D>0){parcels.forEach(p=>{const meas=edgeMeasurer(p.feature.geometry||p.feature);p.dist=H.map(h=>meas(h.geo||[h.lon,h.lat]).d);p.hcount=p.dist.filter(x=>x<=D).length;p.viol=setbackViolation(p.dist,A);p.excluded=!!p.viol});
+    if(D>0&&R.mode!=='roof'){parcels.forEach(p=>{const meas=edgeMeasurer(p.feature.geometry||p.feature);p.dist=H.map(h=>meas(h.geo||[h.lon,h.lat]).d);p.hcount=p.dist.filter(x=>x<=D).length;p.viol=setbackViolation(p.dist,A);p.excluded=!!p.viol});
       for(let g=0;g<parcels.length;g++){const k=keptParcels();if(!k.length)break;const um=H.map((h,i)=>Math.min(...k.map(p=>p.dist[i])));if(!setbackViolation(um,A))break;
         k.sort((x,y)=>y.dist.filter(v=>v<=D).length-x.dist.filter(v=>v<=D).length||Math.min(...x.dist)-Math.min(...y.dist))[0].excluded=true}}
     if(R.mode==='roof'){(R.roofs||[]).forEach(b=>{b.blocked=false;b.viol=null;if(!(D>0))return;const meas=edgeMeasurer(b.geo);const ds=H.map(h=>meas(h.geo||[h.lon,h.lat]).d);b.viol=setbackViolation(ds,A);b.blocked=!!b.viol})}
@@ -2670,6 +2676,7 @@ async function autoMax(){
 let sbTimer=null;function autoSetback(){clearTimeout(sbTimer);sbTimer=setTimeout(()=>recheckSetback(false),700)}
 $('setbackRe').onclick=()=>recheckSetback(true);
 $('maxRun').onclick=()=>autoMax();
+$('roofPick').onclick=()=>{window.ROOF_PICK=!window.ROOF_PICK;$('roofPick').classList.toggle('primary',window.ROOF_PICK);$('roofPick').textContent=window.ROOF_PICK?'🏭 지붕 선택 끝내기':'🏭 지붕 건물 추가·빼기 (지도 클릭)';toast(window.ROOF_PICK?'지도에서 건물을 누르면 지붕에 넣거나 뺍니다.':'지붕 선택을 끝냈습니다.')};
 ['orient','nRow','nCol','gapU','tilt','wp','mH','mW','setback','pitch','h0','h1','clr','minGap'].forEach(id=>{const el=$(id);if(el)el.addEventListener('change',()=>{if(!parcels.length)return;unionCache={};if(['wp','mH','mW'].includes(id))$('modPick').value='';if(layoutLayer)liveRun(true);else run()})});
 $('modPick').onchange=()=>{const v=$('modPick').value;if(!v)return;const [w,h,b]=v.split(',');$('wp').value=w;$('mH').value=h;$('mW').value=b;autoMax()};
 
