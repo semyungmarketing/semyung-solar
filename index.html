@@ -1269,7 +1269,7 @@ function build3D(r,Lay){
   const roofs=(r.roofs||[]).map(b=>({b,h:bldHeight(b),f:turf.feature(b.geo)}));
   roofs.forEach(o=>extr(o.b.geo,o.h,0xe9ece8));
   // 모듈: 앞(남쪽) 가장자리는 낮게, 뒤는 경사만큼 높게. 앞 모듈과 붙어 있으면 연속 적층으로 한 단씩 올림
-  const t=Lay.flush?0:CFG.tilt*Math.PI/180,leg=Lay.flush?0.15:(r.mode==='ground'?0.8:0.5);
+  const t=Lay.flush?0:CFG.tilt*Math.PI/180,leg=Lay.flush?0.15:(CFG.stH0!==undefined?+CFG.stH0:(r.mode==='ground'?0.8:0.5));
   const mods=(Lay.quads||[]).map(q=>{const pts=q.map(p=>XY([p[1],p[0]]));const cx=pts.reduce((s,p)=>s+p[0],0)/pts.length,cy=pts.reduce((s,p)=>s+p[1],0)/pts.length;
     const e1=[pts[1][0]-pts[0][0],pts[1][1]-pts[0][1]],e2=[pts[3][0]-pts[0][0],pts[3][1]-pts[0][1]];const l1=Math.hypot(...e1),l2=Math.hypot(...e2);
     // 경사 방향(깊이) 축: 남쪽 성분이 더 큰 축
@@ -1294,6 +1294,17 @@ function build3D(r,Lay){
       return toV(sx,sy,base+(0.5-s)*rise)};
     const v=m.pts.map(corner);[[0,1,2],[0,2,3]].forEach(tr=>tr.forEach(k=>pos.push(v[k].x,v[k].y,v[k].z)))});
   const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));pg.computeVertexNormals();
+  // 구조물: 기둥·경사보·띠장 (구조·부재·물량 설정과 같은 규칙)
+  try{const c=stCfg(),frames=structFrames(r,Lay.quads),steel=new THREE.MeshLambertMaterial({color:0x7d8794});
+    const bar=(a,b,sz)=>{const A=toV(...a),B=toV(...b),len=A.distanceTo(B);if(len<0.01)return;const m=new THREE.Mesh(new THREE.BoxGeometry(sz,len,sz),steel);m.position.copy(A.clone().add(B).multiplyScalar(0.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),B.clone().sub(A).normalize());scene.add(m)};
+    frames.forEach(F=>{const base=mods[F.mods[0]]?mods[F.mods[0]].h:0,lift=c.stH0-leg;const at=(u,sv)=>[u*F.rv[0]+sv*F.f[0],u*F.rv[1]+sv*F.f[1]];
+      const zAt=x=>base+leg+lift+x*Math.tan(t)-0.06; // x: 앞끝에서 뒤쪽으로 수평거리
+      const span=Math.max(0,F.len-2*c.stOver),lines=Math.max(2,Math.ceil(span/c.stPost-1e-6)+1);
+      for(let k=0;k<lines;k++){const u=F.u0+c.stOver+(lines>1?k*span/(lines-1):span/2);
+        const xs=c.stLeg==='1'?[F.depthH/2]:[c.stInset,F.depthH-c.stInset];
+        xs.forEach(x=>{const p=at(u,F.sFront-x);bar([p[0],p[1],base],[p[0],p[1],zAt(x)],0.1)});
+        const a0=at(u,F.sFront),a1=at(u,F.sFront-F.depthH);bar([a0[0],a0[1],zAt(0)],[a1[0],a1[1],zAt(F.depthH)],0.08)}
+      for(let ti=0;ti<F.tiers;ti++)[0.25,0.75].forEach(fr=>{const x=(ti+fr)*F.depthH/F.tiers,p0=at(F.u0,F.sFront-x),p1=at(F.u1,F.sFront-x);bar([p0[0],p0[1],zAt(x)+0.05],[p1[0],p1[1],zAt(x)+0.05],0.05)})})}catch(e){console.warn('구조물 3D',e)}
   scene.add(new THREE.Mesh(pg,new THREE.MeshPhongMaterial({color:0x1b3a8a,specular:0x6a8cff,shininess:60,side:THREE.DoubleSide})));
   // 카메라: 남동쪽 위에서
   const allX=mods.length?mods.map(m=>m.cx):[0],allY=mods.length?mods.map(m=>m.cy):[0];
@@ -1309,6 +1320,98 @@ function build3D(r,Lay){
   $('#v3reset').onclick=()=>{az=-0.6;el=0.55;dist=span*1.6;place()};
   $('#v3top').onclick=()=>{el=1.5;place()};
   V3={ren,scene};
+}
+
+/* ===== 구조·부재·물량 =====
+   자동 배치(설계 계산기 엔진) 결과의 모듈을 테이블(프레임)로 묶고,
+   테이블마다 포스트 간격으로 기둥 줄을 세워 기둥·경사보·띠장 수량과 길이·중량을 계산한다. */
+const ST_SPECS={
+  col:[['□100×100×2.3T',6.95],['□100×100×3.2T',9.52],['□75×75×2.3T',5.17],['□125×125×3.2T',12.0]],
+  gir:[['C-100×50×20×3.2T',5.50],['C-100×50×20×2.3T',4.06],['C-125×50×20×3.2T',6.13],['□100×100×2.3T',6.95]],
+  pur:[['C-100×50×20×2.3T',4.06],['C-75×45×15×2.3T',3.25],['C-100×50×20×3.2T',5.50]]
+};
+const ST_DEF={stPost:3.0,stOver:0.6,stLeg:'2',stInset:0.4,stH0:0.8,stEmbed:0,stMat:'포스맥(PosMAC)',
+  stCol:'□100×100×2.3T',stWCol:6.95,stGir:'C-100×50×20×3.2T',stWGir:5.5,stPur:'C-100×50×20×2.3T',stWPur:4.06};
+function stCfg(){const o={};for(const k in ST_DEF)o[k]=CFG[k]!==undefined?CFG[k]:ST_DEF[k];return o}
+
+/* 모듈 사각형(위도·경도) → 테이블(프레임) 목록 */
+function structFrames(r,quads){
+  if(!quads||!quads.length)return[];
+  const kx=111320*Math.cos(r.lat*Math.PI/180),ky=110540;
+  const M=quads.map(q=>{const P=q.map(p=>[(p[1]-r.lon)*kx,(p[0]-r.lat)*ky]);const cx=P.reduce((a,p)=>a+p[0],0)/4,cy=P.reduce((a,p)=>a+p[1],0)/4;
+    const e1=[P[1][0]-P[0][0],P[1][1]-P[0][1]],e2=[P[3][0]-P[0][0],P[3][1]-P[0][1]],l1=Math.hypot(...e1),l2=Math.hypot(...e2);
+    const useE1=Math.abs(e1[1])/l1>Math.abs(e2[1])/l2;const d=useE1?e1:e2,dl=useE1?l1:l2,wl=useE1?l2:l1;let f=[d[0]/dl,d[1]/dl];if(f[1]>0)f=[-f[0],-f[1]];
+    return{cx,cy,f,depth:dl,w:wl,P}});
+  // 같은 프레임: 옆으로 붙었거나(같은 줄) 앞뒤로 정확히 한 장 깊이만큼 떨어진 모듈
+  const cell=6,grid=new Map();M.forEach((m,i)=>{const k=Math.floor(m.cx/cell)+','+Math.floor(m.cy/cell);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(i)});
+  const comp=new Array(M.length).fill(-1);let nc=0;
+  for(let i=0;i<M.length;i++){if(comp[i]>=0)continue;const st=[i];comp[i]=nc;
+    while(st.length){const j=st.pop(),m=M[j],gx=Math.floor(m.cx/cell),gy=Math.floor(m.cy/cell);
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(const k of grid.get((gx+dx)+','+(gy+dy))||[]){if(comp[k]>=0)continue;const o=M[k];
+        const ds=Math.abs((o.cx-m.cx)*m.f[0]+(o.cy-m.cy)*m.f[1]),dw=Math.abs((o.cx-m.cx)*-m.f[1]+(o.cy-m.cy)*m.f[0]);
+        if((ds<0.3&&dw<m.w+0.3)||(Math.abs(ds-m.depth)<0.3&&dw<0.6)){comp[k]=nc;st.push(k)}}}nc++}
+  const frames=[];
+  for(let c=0;c<nc;c++){const ids=M.map((m,i)=>i).filter(i=>comp[i]===c),m0=M[ids[0]],f=m0.f,rv=[-f[1],f[0]];
+    const s=ids.map(i=>M[i].cx*f[0]+M[i].cy*f[1]),u=ids.map(i=>M[i].cx*rv[0]+M[i].cy*rv[1]);
+    const front=Math.max(...s),back=Math.min(...s),tiers=Math.round((front-back)/m0.depth)+1;
+    const u0=Math.min(...u)-m0.w/2,u1=Math.max(...u)+m0.w/2;
+    frames.push({n:ids.length,tiers,len:u1-u0,depthH:tiers*m0.depth,f,rv,u0,u1,sFront:front+m0.depth/2,mods:ids})}
+  return frames;
+}
+
+/* 프레임 → 부재 수량 */
+function structBOM(r,frames,tiltDeg){
+  const c=stCfg(),t=tiltDeg*Math.PI/180,legs=c.stLeg==='1'?1:2;
+  let nCol=0,lCol=0,nGir=0,lGir=0,nPur=0,lPur=0,maxBack=0;
+  frames.forEach(F=>{const slope=F.depthH/Math.cos(t);const rise=slope*Math.sin(t);
+    const span=Math.max(0,F.len-2*c.stOver),lines=Math.max(2,Math.ceil(span/c.stPost-1e-6)+1);
+    const hFront=c.stH0+(c.stInset)*Math.tan(t),hBack=c.stH0+rise-(c.stInset)*Math.tan(t);maxBack=Math.max(maxBack,hBack);
+    F.lines=lines;F.hFront=hFront;F.hBack=hBack;F.slope=slope;
+    if(legs===2){nCol+=lines*2;lCol+=lines*(hFront+hBack+2*c.stEmbed)}else{nCol+=lines;lCol+=lines*((hFront+hBack)/2+c.stEmbed)}
+    nGir+=lines;lGir+=lines*slope;
+    nPur+=2*F.tiers;lPur+=2*F.tiers*F.len});
+  const rows=[
+    {k:'기둥(포스트)',spec:c.stCol,n:nCol,len:lCol,w:c.stWCol},
+    {k:'경사보(주보)',spec:c.stGir,n:nGir,len:lGir,w:c.stWGir},
+    {k:'띠장(가로보)',spec:c.stPur,n:nPur,len:lPur,w:c.stWPur}];
+  rows.forEach(x=>x.kg=x.len*x.w);
+  return{rows,kg:rows.reduce((s,x)=>s+x.kg,0),frames:frames.length,mods:frames.reduce((s,F)=>s+F.n,0),maxBack,c};
+}
+
+function structHTML(r,L){
+  if(!L||!L.quads||!L.quads.length)return'';
+  const frames=structFrames(r,L.quads),B=structBOM(r,frames,L.flush?0:CFG.tilt),c=B.c,kW=L.kw||0;
+  r._struct={frames,B};
+  const opt=(list,val)=>list.map(([n,w])=>`<option value="${esc(n)}" data-w="${w}" ${n===val?'selected':''}>${esc(n)}</option>`).join('');
+  return `<h4 class="sec" style="margin-top:14px">구조·부재·물량</h4>
+  <div class="field"><label for="stPost">포스트 간격 (m)</label><input id="stPost" type="number" step="0.1" value="${c.stPost}"></div>
+  <div class="field"><label for="stOver">양끝 내민길이 (m)</label><input id="stOver" type="number" step="0.05" value="${c.stOver}"></div>
+  <div class="field"><label for="stLeg">기둥 방식</label><select id="stLeg"><option value="2" ${c.stLeg==='2'?'selected':''}>앞·뒤 2주식</option><option value="1" ${c.stLeg==='1'?'selected':''}>중앙 1주식</option></select></div>
+  <div class="field"><label for="stInset">기둥 위치 (앞·뒤 끝에서 안쪽, 수평 m)</label><input id="stInset" type="number" step="0.05" value="${c.stInset}"></div>
+  <div class="field"><label for="stH0">모듈 하단 높이 (m)</label><input id="stH0" type="number" step="0.05" value="${c.stH0}"></div>
+  <div class="field"><label for="stEmbed">기초 매입·여유 길이 (m/본)</label><input id="stEmbed" type="number" step="0.05" value="${c.stEmbed}"></div>
+  <div class="field"><label for="stMat">재질</label><select id="stMat">${['포스맥(PosMAC)','용융아연도금(SS275)','알루미늄'].map(m=>`<option ${m===c.stMat?'selected':''}>${m}</option>`).join('')}</select></div>
+  <div class="tblwrap"><table style="width:100%;font-size:12px;border-collapse:collapse;background:#fff;border:1px solid var(--line);margin-top:6px">
+   <thead><tr><th>부재</th><th>규격</th><th>단위중량(kg/m)</th><th>수량</th><th>총길이(m)</th><th>중량(kg)</th></tr></thead><tbody>
+   <tr><td>기둥(포스트)</td><td><select id="stCol">${opt(ST_SPECS.col,c.stCol)}<option value="__">직접 입력</option></select></td><td><input id="stWCol" type="number" step="0.01" value="${c.stWCol}" style="width:70px"></td><td class="num">${nf(B.rows[0].n)}본</td><td class="num">${nf(B.rows[0].len,1)}</td><td class="num">${nf(B.rows[0].kg)}</td></tr>
+   <tr><td>경사보(주보)</td><td><select id="stGir">${opt(ST_SPECS.gir,c.stGir)}<option value="__">직접 입력</option></select></td><td><input id="stWGir" type="number" step="0.01" value="${c.stWGir}" style="width:70px"></td><td class="num">${nf(B.rows[1].n)}본</td><td class="num">${nf(B.rows[1].len,1)}</td><td class="num">${nf(B.rows[1].kg)}</td></tr>
+   <tr><td>띠장(가로보)</td><td><select id="stPur">${opt(ST_SPECS.pur,c.stPur)}<option value="__">직접 입력</option></select></td><td><input id="stWPur" type="number" step="0.01" value="${c.stWPur}" style="width:70px"></td><td class="num">${nf(B.rows[2].n)}본</td><td class="num">${nf(B.rows[2].len,1)}</td><td class="num">${nf(B.rows[2].kg)}</td></tr>
+   <tr><td colspan="5"><b>합계</b> · 테이블 ${nf(B.frames)}개 · 모듈 ${nf(B.mods)}장</td><td class="num"><b>${nf(B.kg)}</b></td></tr></tbody></table></div>
+  <p class="hint">kW당 강재 ${kW?nf(B.kg/kW,1):'-'} kg · 가장 높은 뒷기둥 ${nf(B.maxBack,2)} m · 재질 ${esc(c.stMat)}. 테이블마다 포스트 간격으로 기둥 줄을 세우고(양끝 내민길이 제외, 최소 2줄), 줄마다 ${c.stLeg==='2'?'앞·뒤 기둥 2본':'중앙 기둥 1본'} + 경사보 1본, 모듈 단마다 띠장 2본으로 셉니다. 단위중량은 KS 계산식·표 기준 기본값이며 제조사 값으로 고쳐 쓸 수 있습니다.</p>
+  <button class="btn alt" id="stCsv" type="button" style="width:100%;margin:2px 0 12px">부재 물량 CSV 내려받기</button>`;
+}
+function bindStruct(){
+  const num=['stPost','stOver','stInset','stH0','stEmbed','stWCol','stWGir','stWPur'];
+  num.forEach(k=>{const e=$('#'+k);if(e)e.onchange=()=>{CFG[k]=+e.value;saveCfg();render3()}});
+  ['stLeg','stMat'].forEach(k=>{const e=$('#'+k);if(e)e.onchange=()=>{CFG[k]=e.value;saveCfg();render3()}});
+  [['stCol','stWCol'],['stGir','stWGir'],['stPur','stWPur']].forEach(([k,w])=>{const e=$('#'+k);if(!e)return;e.onchange=()=>{
+    if(e.value==='__'){const n=prompt('부재 규격을 입력하세요 (예: □100×100×3.2T)');if(!n){render3();return}const kg=parseFloat(prompt('단위중량 (kg/m)','5'))||0;CFG[k]=n;CFG[w]=kg}
+    else{CFG[k]=e.value;CFG[w]=+e.selectedOptions[0].dataset.w}saveCfg();render3()}});
+  const b=$('#stCsv');if(b)b.onclick=()=>{const S=R&&R._struct;if(!S)return;const B=S.B;
+    const rows=[['부재','규격','재질','수량(본)','총길이(m)','단위중량(kg/m)','중량(kg)']].concat(B.rows.map(x=>[x.k,x.spec,B.c.stMat,x.n,x.len.toFixed(1),x.w,x.kg.toFixed(0)]));
+    rows.push(['합계','','','','','',B.kg.toFixed(0)]);rows.push([]);rows.push(['테이블','모듈 수','단수','길이(m)','기둥 줄','앞기둥 높이(m)','뒷기둥 높이(m)']);
+    S.frames.forEach((F,i)=>rows.push([i+1,F.n,F.tiers,F.len.toFixed(2),F.lines,F.hFront.toFixed(2),F.hBack.toFixed(2)]));
+    const blob=new Blob(['\ufeff'+rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`부재물량_${(R.parcel&&R.parcel.jibunNo)||'부지'}.csv`;a.click()};
 }
 
 /* ===== 계산 ===== */
@@ -1422,6 +1525,7 @@ function render3(){
    <p class="hint">건물 윤곽에서 여유폭을 띄우고, 지붕선에 맞춰 남쪽 끝부터 모듈을 깔아 장수를 셉니다. 경사가대는 이격거리 = 프레임 깊이 + 프레임 높이 ÷ tan(음영각)으로 계산하고 뒷다리 5m 안에서 적층 단수를 고릅니다(계산기 v123과 같은 원칙). 용마루·지붕 경사·환기구·채광창은 반영하지 않으므로 최종 설계는 지붕 어레이 설계 계산기에서 확정하세요.</p>
    <button class="btn sun" id="btn3d" style="width:100%;margin:4px 0 12px">🧊 3D로 보기</button>
    <button class="btn alt" id="roofPick" style="width:100%;margin:0 0 12px">${window.ROOF_PICK?'🏭 지붕 선택 끝내기':'🏭 지붕 건물 추가·빼기 (지도 클릭)'}</button>
+   ${L.source==='engine'?structHTML(r,L):'<p class="hint">구조·부재·물량은 설계 엔진 배치가 끝나면 나옵니다.</p>'}
    <div class="field"><label for="inHours">발전시간 직접 입력(h, 0=자동)</label><input id="inHours" type="number" step="0.01" value="${CFG.hoursManual}"></div>
    <p class="hint">일사량: ${esc(r.sun.src)}${r.sun.ghi?` · 수평면 ${r.sun.ghi.toFixed(2)}kWh/㎡·일 × ${L.flush?'평행 설치 1.00':'경사 보정 1.10'} × 방위 보정(정남에서 ${Math.round(L.devDeg)}° 틀어짐) × 시스템효율 0.82`:''}.</p>`;}
   else h+=`${r.parcel.manual?`<div class="field"><label for="inArea">부지 면적(㎡)</label><input id="inArea" type="number" value="${CFG.area||3300}"></div><p class="hint">필지 경계가 없어 면적을 직접 넣습니다. 📐 분석도구의 '부지 직접 그리기'로도 지정할 수 있습니다.</p>`:''}
@@ -1441,6 +1545,7 @@ function render3(){
   bind('#inArea','area');bind('#inPy','pyeongPerKw');bind('#inHours','hoursManual');bind('#inSetback','setback');bind('#inTilt2','tilt');bind('#inShade','shade');
   const bs=(id,k)=>{const e=$(id);if(e)e.onchange=()=>{CFG[k]=e.value;saveCfg();R._lay=null;drawResult(R);render1();render3();render4()}};bs('#inMod','module');bs('#inArr','arrMode');bs('#inOri','orient');bs('#inLayMode','layMode');bs('#inLayScope','layScope');
   if($('#btn3d'))$('#btn3d').onclick=()=>open3D(R);
+  bindStruct();
   if($('#roofPick'))$('#roofPick').onclick=()=>{window.ROOF_PICK=!window.ROOF_PICK;render3();toast(window.ROOF_PICK?'지도에서 건물을 누르면 지붕에 넣거나 뺍니다.':'지붕 선택을 끝냈습니다.')};bindMode();
   if(r.sun.monthly)needChart().then(()=>{const cv=$('#chMon');if(!cv||cv.dataset.done)return;cv.dataset.done=1;new Chart(cv,{type:'bar',data:{labels:['1','2','3','4','5','6','7','8','9','10','11','12'].map(m=>m+'월'),datasets:[{label:'월 발전량(MWh)',data:r.sun.monthly.map((g,i)=>f.kw*g*1.10*0.82*[31,28,31,30,31,30,31,31,30,31,30,31][i]/1000),backgroundColor:'#F2A900'}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:'월별 예상 발전량 (MWh)'}},scales:{y:{beginAtZero:true}}}})}).catch(()=>{})
   sunWidget(r.lat);
