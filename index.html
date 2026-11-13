@@ -816,7 +816,7 @@ async function search(q){
   if(!items.length){box.innerHTML=`<button disabled>검색 결과가 없습니다. ${CFG.vkey?'시·군·읍면 이름부터 넣어 보세요.':'⚙ 설정에서 브이월드 키를 넣으면 지번 검색이 정확해집니다.'}</button>`;return}
   const canAdd=!!(R&&R.parcel&&R.parcel.geo&&window.LAY&&LAY.addAt);
   box.innerHTML=items.map((x,i)=>`<div style="display:flex;border-bottom:1px solid var(--line)"><button data-i="${i}" style="flex:1;border:0">${esc(x.t)}<br><small>${esc(x.s)}</small></button>${canAdd?`<button data-add="${i}" title="지금 부지에 이 필지 추가" style="flex:none;width:auto;border:0;border-left:1px solid var(--line);color:var(--pine);font-weight:700;padding:0 12px">＋ 추가</button>`:''}</div>`).join('');
-  box.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const x=items[+b.dataset.i];box.style.display='none';map.setView([x.lat,x.lon],17);analyze(L.latLng(x.lat,x.lon))});
+  box.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{const x=items[+b.dataset.i];box.style.display='none';$('#q').value='';map.setView([x.lat,x.lon],17);analyze(L.latLng(x.lat,x.lon))});
   box.querySelectorAll('button[data-add]').forEach(b=>b.onclick=async()=>{const x=items[+b.dataset.add];box.style.display='none';$('#q').value='';await LAY.addAt(x.lat,x.lon);$$('.tabs button').find(t=>t.dataset.tab==='t6').click()});
 }
 $('#searchForm').onsubmit=e=>{e.preventDefault();const q=$('#q').value.trim();if(q)search(q)};
@@ -1027,6 +1027,12 @@ let busy=false;
 const RESULT_CACHE=new Map();
 async function analyze(ll,drawn){
   if(busy)return;
+  window.ROOF_OVR={};window.REF_ROOF=false;window.ROOF_PICK=false;if($('roofPick')){$('roofPick').classList.remove('primary');$('roofPick').textContent='🏭 지붕 건물 추가·빼기 (지도 클릭)'}
+  try{return await analyzeCore(ll,drawn)}
+  catch(e){console.error(e);toast('분석 중 오류가 났습니다: '+e.message+' — 다시 검색해 주세요.')}
+  finally{if(busy){busy=false;$('#loading').classList.remove('on')}}
+}
+async function analyzeCore(ll,drawn){
   if(!leadDone()){prefillGate();$('#dlgAgree').showModal();return}
   const lat=ll.lat,lon=ll.lng;
   const sg=findSgg(lat,lon);
@@ -1699,7 +1705,7 @@ $('drawDone').onclick=()=>{
   if(drawPts.length<3){msg('pMsg','꼭짓점을 3개 이상 찍어 주세요.',true);return}
   const ring=drawPts.map(p=>[p.lng,p.lat]);ring.push(ring[0]);
   manualN++; addParcel({type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[ring]}},{pnu:null,addr:'직접 입력',jibun:'직접'+manualN,jimok:''});
-  drawPts=[];map.removeLayer(drawLine);drawLine=null;msg('pMsg','직접 입력 영역을 추가했습니다.');
+  drawPts=[];if(drawLine)map.removeLayer(drawLine);drawLine=null;setMode('draw');msg('pMsg','직접 입력 영역을 추가했습니다. 더 그리려면 [직접 그리기]를 다시 누르세요.');
 };
 async function layClick(e){
   if(mode==='anchor'){setMode('anchor');$('mAnchor').classList.remove('on');setAnchor(e.latlng);msg('lMsg','시작점을 지정했습니다. 📍를 끌거나 ▲▼◀▶로 미세 조정하세요.');return}
@@ -1919,7 +1925,7 @@ let unionCache={key:'',u:null,total:0};
 function siteUnion(sb){
   // 건물 지붕형: 필지 안 건물 지붕(이격에 걸린 건물 제외)에 배치
   if(typeof R!=='undefined'&&R&&R.mode==='roof'&&(R.roofs||[]).length){
-    const rs=R.roofs.filter(b=>!b.blocked);if(!rs.length)return{u:null,total:0};
+    const rs=window.REF_ROOF?R.roofs.slice():R.roofs.filter(b=>!b.blocked);if(!rs.length)return{u:null,total:0};
     const key='roof#'+rs.map(b=>Math.round(b.area)).join('|')+'#'+sb;if(unionCache.key===key)return unionCache;
     let u=turf.feature(rs[0].geo);for(let i=1;i<rs.length;i++){try{const x=turf.union(u,turf.feature(rs[i].geo));if(x)u=x}catch(e){}}
     const total=turf.area(u);if(sb>0){u=turf.buffer(u,-sb,{units:'meters'});if(!u||!u.geometry)u=null}
@@ -2558,10 +2564,10 @@ $('simRun').onclick=async()=>{$('simRun').disabled=true;T3.busy=true;msg('sMsg',
 
 
 // ---------- 부지진단 연동 ----------
-let lastR=null;
+let lastR=null,LAYGEN=0;
 function onResult(r){
   if(!r)return;$('layEmpty').style.display='none';$('layWrap').style.display='';
-  if(r===lastR)return;lastR=r;
+  if(r===lastR)return;lastR=r;LAYGEN++;unionCache={};maxPending=false;
   // 새 필지 분석 → 부지 구성 초기화
   parcels.forEach(p=>map.removeLayer(p.layer));parcels=[];clearLayout();LAYOUT=null;$('open3d').disabled=true;$('m3d').textContent='배치 실행 전';
   $('res').innerHTML='<div class="hint">[배치·분석 실행]을 누르세요.</div>';$('bom').innerHTML='';
@@ -2618,13 +2624,14 @@ function applyOrdLay(){const O=ordLay(),t=[];
    ③ 남은 필지에 최대 배치를 찾아 방위각·피치·단수·열수를 화면에 넣고 배치 */
 async function recheckSetback(manual){
   if(typeof R==='undefined'||!R){if(manual)toast('먼저 필지를 분석하세요.');return}
+  const GEN=LAYGEN,stale=()=>GEN!==LAYGEN;
   if(!parcels.length){msg('sbMsg','부지에 필지가 없습니다.',true);return}
   const all=siteUnionGeo(true),c=turf.centroid(all).geometry.coordinates;let rad0=0;turf.coordAll(all).forEach(p=>rad0=Math.max(rad0,turf.distance(c,p,{units:'meters'})));
   msg('sbMsg',`${parcels.length}필지 주변 건물을 확인하는 중…`);
   try{R.siteGeo=parcels.length>1?all:null;R.target=makeTarget(R.lat,R.lon,all);
-    const raw=await fetchNear({...R,lat:c[1],lon:c[0],extraR:Math.round(rad0)});
+    const raw=await fetchNear({...R,lat:c[1],lon:c[0],extraR:Math.round(rad0)});if(stale())return;
     computeNear(R,raw);
-    if(CFG.vkey&&CFG.kepcoProxy){msg('sbMsg','주변 건물 건축물대장 확인 중…');try{const t=await verifyHouses(R,raw);R.verifyMsg=t}catch(e){R.verifyMsg='⚠ '+e.message}computeNear(R,raw)}
+    if(CFG.vkey&&CFG.kepcoProxy){msg('sbMsg','주변 건물 건축물대장 확인 중…');try{const t=await verifyHouses(R,raw);R.verifyMsg=t}catch(e){R.verifyMsg='⚠ '+e.message}if(stale())return;computeNear(R,raw)}
     // 필지별 이격 확인
     // 조례 판정(기존 방식)이 정한 주거 이격거리. 규제 없음·미적용이면 0
     const D=R.applied&&R.applied.mode!=='free'&&R.applied.house>0?R.applied.house:0;
@@ -2640,15 +2647,18 @@ async function recheckSetback(manual){
     if(kept.length){R.target=makeTarget(R.lat,R.lon,g);computeNear(R,{...raw})}
     judge(R);drawResult(R);renderAll();renderParcelTable();
     const sb=R.setback||{};
-    if(R.mode==='roof'){const rs=R.roofs||[],bl=rs.filter(b=>b.blocked).length;msg('sbMsg',`건물 지붕형: 필지 안 건물 ${rs.length}동${bl?` 중 ${bl}동은 이격 기준에 걸려 제외`:''} · 건물 외곽 기준 이격 확인${D?` (${D}m)`:''}`,bl===rs.length&&rs.length>0);if(rs.length&&bl<rs.length){autoMax();return}if(!rs.length){msg('sbMsg','필지 안에 지붕으로 쓸 건물이 없습니다. 토지 지상형으로 바꿔 보세요.',true);return}}
+    // 지붕형인데 쓸 건물이 없으면 토지 지상형으로 자동 전환
+    if(R.mode==='roof'&&!(R.roofs||[]).length){R.mode='ground';if(R.modeUser==='roof')R.modeUser=null;applyOrdLay();toast('부지 안에 지붕으로 쓸 건물이 없어 토지 지상형으로 배치합니다.');judge(R);drawResult(R);renderAll()}
+    if(R.mode==='roof'){const rs=R.roofs||[],bl=rs.filter(b=>b.blocked).length;window.REF_ROOF=rs.length>0&&bl===rs.length;
+      msg('sbMsg',window.REF_ROOF?`⚠ 지붕 건물 ${rs.length}동 모두 이격 기준에 걸립니다. 아래는 참고용 최대 배치입니다.`:`건물 지붕형: 필지 안 건물 ${rs.length}동${bl?` 중 ${bl}동은 이격 기준에 걸려 제외`:''} · 건물 외곽 기준 이격 확인${D?` (${D}m)`:''}`,window.REF_ROOF);autoMax();return}
     msg('sbMsg',`${REF_LAYOUT?'⚠ 모든 필지가 조례 이격에 걸립니다. 아래 배치는 참고용 최대 배치입니다(현재 기준으로는 허가가 어려움) · ':ex?`이격 저촉으로 ${ex}필지 제외 · `:''}${REF_LAYOUT?'':`남은 ${kept.length}필지 `}외곽 기준: 가장 가까운 주택 외벽 ${sb.nearAny!=null?fmt(sb.nearAny,1)+'m':'없음'}${D?` · ${D}m 안 포함한 주택 ${(R.near.houses||[]).filter(h=>h.counted&&h.d<=D).length}호`:''}${R.verifyMsg?' · '+R.verifyMsg:''}`,REF_LAYOUT);
     autoMax();
   }catch(e){msg('sbMsg','이격거리를 확인하지 못했습니다: '+e.message,true)}
 }
 /* 최대 배치: 방위(정남 ±10°, 부지 경계선 방향)·설치 방향·단수(뒷다리 5m 안)·테이블 열수를 바꿔 가며 장수가 가장 많은 조합을 찾아 화면에 적용 */
-let maxBusy=false;
+let maxBusy=false,maxPending=false;
 async function autoMax(){
-  if(maxBusy||!keptParcels().length)return;maxBusy=true;
+  if(maxBusy){maxPending=true;return}if(!keptParcels().length)return;maxBusy=true;const GEN=LAYGEN;
   const v=id=>parseFloat($(id).value);const save={o:$('orient').value,r:$('nRow').value,c:$('nCol').value,a:$('azNum').value,s:$('azSel').value,m:$('arrMode').value};
   try{
     $('arrMode').value='auto';$('arrMode').dispatchEvent(new Event('change'));if(ordLay().modGap>0)$('gapU').value=ordLay().modGap;
@@ -2664,14 +2674,14 @@ async function autoMax(){
       for(let nr=1;nr<=maxR;nr++)for(const nc of cols)for(const az of azs){
         $('orient').value=o;$('nRow').value=nr;$('nCol').value=nc;const R0=computeLayout(az);n++;
         if(R0&&(!best||R0.nMod>best.nMod))best={nMod:R0.nMod,o,nr,nc,az};
-        if(n%25===0){msg('bestMsg',`최대 배치 찾는 중… ${n}회 계산`);await new Promise(r=>setTimeout(r,0))}}}
-    if(!best){msg('bestMsg','배치할 자리가 없습니다.',true);return}
+        if(n%25===0){msg('bestMsg',`최대 배치 찾는 중… ${n}회 계산`);await new Promise(r=>setTimeout(r,0));if(GEN!==LAYGEN){maxPending=true;return}}}}
+    if(!best){msg('bestMsg',`배치할 자리가 없습니다. ${R.mode==='roof'?'지붕 건물이 너무 작거나 가장자리 여유(경계 이격)가 큽니다.':'필지가 좁거나 경계 이격('+($('setback').value||0)+'m)이 큽니다. 경계 이격을 줄이거나 필지를 더해 보세요.'}`,true);toast('배치할 자리가 없습니다 — 배치설계 탭 안내를 확인하세요.');return}
     $('orient').value=best.o;$('nRow').value=best.nr;$('nCol').value=best.nc;$('azSel').value='c';$('azNum').value=best.az;$('azRange').value=best.az;
     ANCHOR=null;if(ancMarker){map.removeLayer(ancMarker);ancMarker=null}$('ancVal').textContent='자동';
     doRun();
     msg('bestMsg',`최대 배치: ${fmt(best.nMod)}장 · 방위 ${best.az}° · ${best.o==='P'?'세로':'가로'} ${best.nr}단 · ${(()=>{const O=ordLay();return O.contLen?`조례 기준 연속 ${O.contLen}m마다 ${O.contGap}m 띄움`:O.modGap?`조례 기준 어레이 간격 ${O.modGap}m`:'줄마다 끊김 없는 연속 어레이(테이블 좌우간격 0)'})()}${ordLay().buf?' · 부지경계 완충 '+ordLay().buf+'m':''} (${n}가지 조합 중). 좌우간격·열수를 넣으면 그 조건으로 다시 배치합니다.`);
   }catch(e){Object.assign(window,{});$('orient').value=save.o;$('nRow').value=save.r;$('nCol').value=save.c;msg('bestMsg','최대 배치를 찾지 못했습니다: '+e.message,true)}
-  finally{maxBusy=false}
+  finally{maxBusy=false;if(maxPending){maxPending=false;setTimeout(autoMax,0)}}
 }
 let sbTimer=null;function autoSetback(){clearTimeout(sbTimer);sbTimer=setTimeout(()=>recheckSetback(false),700)}
 $('setbackRe').onclick=()=>recheckSetback(true);
